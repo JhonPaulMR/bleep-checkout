@@ -23,7 +23,7 @@ agente executa o commit, mas só depois do seu "pode commitar".
 ## 🌳 Fluxo Git e Proteção da Produção (GitHub Flow)
 
 - **A branch `main` é sagrada:** Ela reflete a produção e possui bloqueio de commits diretos.
-- **Trabalho:** Crie uma branch curta **a partir da `main`** para cada Issue (feature branch).
+- **Trabalho:** Crie uma branch curta **a partir da `main`** para cada Issue, nomeada `feature/<numero-da-issue>-<slug>`. Manutenção (bug, tarefa técnica, setup) usa `chore/<slug>`.
 - **Integração:** Ao finalizar, abra um Pull Request contra a `main` com `Closes #<n>`. O Portão de Entendimento precisa passar antes do merge; a esteira de testes e lint chega com a Issue de CI (ID18) e, a partir dela, passa a ser exigida também.
 
 ---

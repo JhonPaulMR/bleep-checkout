@@ -36,7 +36,7 @@ que foi decidida. O que não estiver escrito lá, você pergunta; não escolhe.
 ## Passo 1 — Branch
 
 ```
-git switch -c setup-monorepo
+git switch -c chore/setup-monorepo
 ```
 
 Nenhum arquivo é criado antes da branch existir. A `main` é bloqueada.
