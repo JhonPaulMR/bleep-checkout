@@ -18,7 +18,7 @@ Sempre que o usuário pedir para trabalhar em uma Issue (Feature), você atuará
 
 ```bash
 git switch main && git pull
-git switch -c <numero-da-issue>-<slug>
+git switch -c feature/<numero-da-issue>-<slug>
 ```
 
 - Após sanar as dúvidas, redija o documento e salve no caminho `specs/<NNN>-<slug>/spec.md` — número da Issue com três dígitos (`specs/027-pagamento-do-pedido/`); a branch não leva o zero (`27-pagamento-do-pedido`) — com este frontmatter e estas seções, nesta ordem:

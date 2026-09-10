@@ -32,7 +32,8 @@ Ao estourar qualquer um dos dois, PARE IMEDIATAMENTE e diga qual estourou: "Esto
 
 ## 5. Regras de Git 
 - **A branch `main` é sagrada e bloqueada.** Nunca faça commits diretos na `main`.
-- Toda implementação nasce em uma branch separada (Feature Branch), criada a partir da `main`.
+- Toda implementação nasce em uma branch separada, criada a partir da `main`, e **o nome carrega o tipo**: `feature/<numero-da-issue>-<slug>` para história, `chore/<slug>` para manutenção (bug, tarefa técnica, setup).
+- **A pasta da spec não leva prefixo:** `specs/<numero-da-issue>-<slug>/`. O prefixo é da branch, não do caminho no disco.
 - No fim da Issue, instrua o usuário a abrir um Pull Request.
 
 ## 6. Integração com GitHub (MCP)
