@@ -43,10 +43,25 @@ usuário — Issue criada aparece para a turma e para o professor.
 ## Passo 3 — O Kanban (GitHub Projects)
 
 A criação do board é **manual** (a interface do Projects muda rápido e o
-aluno precisa conhecê-la): oriente-o a criar um Project no repositório com as
-colunas `Backlog`, `Ready`, `In Progress`, `Blocked`, `Done`, e a adicionar as
-Issues recém-criadas — `Must Have` primeiro no topo do `Backlog`. (`Blocked` é
-onde uma história espera outra; o guia explica quando isso acontece.)
+aluno precisa conhecê-la): oriente-o a criar um Project no repositório com
+cinco colunas, e diga o que cada uma quer dizer — coluna sem regra de entrada
+e de saída vira depósito:
+
+| Coluna | O que fica nela | Sai quando |
+| --- | --- | --- |
+| `Backlog` | Toda Issue que ainda não começou, ordenada por prioridade | A equipe escolhe a próxima história |
+| `In Progress` | A história em que se está trabalhando **agora** | O trabalho termina ou trava |
+| `In Review` | O Pull Request está aberto e **espera a revisão dos colegas** antes do merge | O PR é mesclado |
+| `Blocked` | A história parada à espera de outra coisa (guia, seção *Quando o ciclo não é linear*) | O impedimento é resolvido |
+| `Done` | PR mesclado e story `Live` no `prd.md` | Nunca |
+
+Adicione as Issues recém-criadas ao `Backlog` — `Must Have` primeiro, no topo.
+
+> **Não crie uma coluna `Ready`.** Ela colidiria com o status `Ready` do
+> `prd.md`, e todo cartão do quadro já é `Ready` por definição — só story
+> `Ready` vira Issue. Se a equipe quiser marcar quais histórias pertencem a
+> qual entrega, isso é **milestone ou etiqueta na Issue**, não coluna: escopo é
+> atributo do cartão e precisa viajar com ele por todas as colunas.
 
 Se o MCP/`gh` da sessão conseguir adicionar as Issues ao Project, ofereça
 fazer isso; se não conseguir, não é erro — siga com a orientação manual.
