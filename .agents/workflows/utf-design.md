@@ -33,6 +33,21 @@ produtos. Não se espera um design system completo — isso não cabe no semestr
 
 ## Passo 1 — Os tokens, um bloco por vez
 
+> **Antes de perguntar, veja se dá para ler.** Se a sessão tiver um servidor MCP de
+> ferramenta de design conectado (Stitch, Figma), use-o **antes** de começar as
+> perguntas: liste as telas e leia a paleta, a tipografia e os espaçamentos que o
+> protótipo já usa. Depois apresente o que encontrou e pergunte **o papel de cada
+> coisa** — *"o protótipo usa estas seis cores; qual delas é a primária? qual é a de
+> perigo?"*.
+>
+> A divisão é essa: **você lê o valor, o aluno nomeia o papel.** Nunca deduza o papel
+> pela frequência de uso, pela posição na tela ou pelo nome que a ferramenta deu — é
+> justamente essa decisão que a disciplina cobra dele. E nunca registre uma cor que o
+> aluno não tenha confirmado.
+>
+> Sem MCP conectado, siga perguntando normalmente: o aluno lê os valores no protótipo e
+> os informa. O resultado é o mesmo; muda só quem digita.
+
 Grave em `docs/design-tokens.md`, colhendo o OK a cada bloco:
 
 1. **Paleta** — as cores, com **nome semântico** (`primaria`, `perigo`, `superficie`,
