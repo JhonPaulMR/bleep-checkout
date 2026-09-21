@@ -1,55 +1,64 @@
 # 🎨 Tokens de Design
 
-**Projeto:** [nome]
-**Versão:** 0.0.0 · esqueleto — preencha via `/utf-design`
-**Última atualização:** [data]
+**Projeto:** Bleep Checkout
+**Versão:** 1.0.0 · proposta visual inicial do tema
+**Última atualização:** 20/09/2026
 
-> 🤖 **Este documento existe para a IA parar de inventar um botão diferente a cada
-> tela.** Não é um design system — é o mínimo que dá à prototipagem assistida algo a
-> que obedecer.
->
-> ✍️ **Não preencha na mão:** rode `/utf-design` (depois do `/utf-flows`).
-
----
+> Esta versão registra uma proposta inicial de linguagem visual para manter as telas coerentes. Antes do commit definitivo da entrega, o aluno deve validar ou ajustar essas escolhas de acordo com o protótipo.
 
 ## Paleta
 
-Nome semântico, nunca `azul-2` — a cor muda, o papel dela não.
+Nome semântico, nunca baseado apenas na aparência da cor.
 
 | Token | Valor | Onde se usa |
 | --- | --- | --- |
-| `primaria` | | ação principal |
-| `superficie` | | fundo de card e painel |
-| `texto` | | texto padrão |
-| `texto-suave` | | legenda, apoio |
-| `perigo` | | erro, exclusão |
-| `sucesso` | | confirmação |
-| `desabilitado` | | controle inativo |
+| `primaria` | `#2563EB` | ações principais, seleção e destaque de elementos importantes |
+| `superficie` | `#FFFFFF` | fundo de cards, painéis e áreas de formulário |
+| `texto` | `#111827` | texto principal e informações essenciais |
+| `texto-suave` | `#6B7280` | legendas, valores auxiliares e mensagens de apoio |
+| `perigo` | `#DC2626` | erros, exclusão e situações que impedem a operação |
+| `sucesso` | `#16A34A` | confirmações, venda concluída e pagamento confirmado |
+| `desabilitado` | `#D1D5DB` | controles indisponíveis e ações temporariamente bloqueadas |
 
 ## Escala de espaçamento
 
-Uma progressão só, usada em tudo.
+Uma única progressão, usada de forma consistente.
 
 | Token | Valor |
 | --- | --- |
-| `xs` / `sm` / `md` / `lg` / `xl` | |
+| `xs` | `4px` |
+| `sm` | `8px` |
+| `md` | `16px` |
+| `lg` | `24px` |
+| `xl` | `32px` |
 
 ## Tipografia
 
 | Token | Família · tamanho · peso | Papel |
 | --- | --- | --- |
+| `titulo-pagina` | Inter · 28px · 700 | título principal de cada área |
+| `titulo-secao` | Inter · 20px · 600 | títulos de cards e seções |
+| `corpo` | Inter · 16px · 400 | textos, campos e informações da operação |
+| `corpo-destaque` | Inter · 16px · 600 | totais, preços e informações importantes |
+| `legenda` | Inter · 13px · 400 | apoio, estados e informações secundárias |
 
 ## Estados de botão
 
 | Estado | Aparência |
 | --- | --- |
-| normal | |
-| hover | |
-| foco (teclado) | |
-| desabilitado | |
-| carregando | |
+| normal | Fundo da cor `primaria`, texto de alto contraste e área clicável claramente identificada. |
+| hover | Mantém a identidade da ação, com contraste ligeiramente mais forte para indicar interação. |
+| foco (teclado) | Contorno visível ao redor do botão, sem depender apenas da mudança de cor. |
+| desabilitado | Usa `desabilitado`, com contraste reduzido e sem aparência de ação disponível. |
+| carregando | Mantém a área e o contexto da ação, mostra indicação de processamento e impede cliques repetidos. |
 
 ## Protótipo
 
-**Link:** [Figma / Stitch / equivalente]
-**Telas:** [3 a 5 telas das jornadas principais]
+**Link Stitch:** [Acesse Aqui](https://stitch.google.com/projects/3188655804959236628)
+**Telas planejadas:**
+
+1. Cadastro e consulta de produtos.
+2. Cadastro de cliente e visualização do crédito disponível.
+3. Simulador de caixa com busca, código de barras, leitor e quantidade.
+4. Tela de pagamento com escolha entre PIX, crédito do cliente, crédito externo e débito externo.
+5. Estado de confirmação/pagamento pendente da venda PIX.
