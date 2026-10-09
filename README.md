@@ -17,7 +17,10 @@ O Bleep Checkout resolve a necessidade de registrar produtos e clientes, montar 
 
 ## Stack
 
-Será definida na próxima etapa da disciplina.
+- NestJS
+- Prisma
+- PostgreSQL
+- Angular
 
 ## Em produção
 
