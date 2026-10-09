@@ -1,8 +1,8 @@
 # 📄 Product Requirements Document (PRD)
 
 **Projeto:** Bleep Checkout
-**Versão:** 1.0.0 · definição do tema e escopo inicial
-**Última atualização:** 20/09/2026
+**Versão:** 1.1.0 · papéis de acesso, venda pendente e cadastros do gerente
+**Última atualização:** 08/10/2026
 
 > 🤖 **Este documento é a fonte da verdade sobre o QUE o produto faz.** Regra de
 > negócio que não estiver aqui não existe — nem para a equipe, nem para a IA.
@@ -40,6 +40,10 @@
 | **Pagamento externo** | Pagamento realizado em uma máquina de cartão fora do sistema e depois registrado pelo operador. | Pagamento por crédito do cliente, cuja validação ocorre pelo saldo cadastrado. |
 | **Forma de pagamento** | Meio escolhido para quitar uma venda: PIX, crédito do cliente, crédito externo ou débito externo. | Condição do pedido, que representa o estado da venda. |
 | **Venda pendente** | Venda cujo pagamento ainda não foi confirmado. | Venda paga ou venda cancelada. |
+| **Gerente** | Pessoa que administra os cadastros: produtos, clientes, crédito e operadores. | Operador de caixa, que realiza as vendas. |
+| **Acesso** | Identificação com que a pessoa entra no sistema e que define o seu papel. | Cadastro de cliente. |
+| **Pagamento** | Tentativa de quitar uma venda em uma forma de pagamento específica, com resultado confirmado, recusado ou abandonado. | Forma de pagamento, que é apenas o meio escolhido. |
+| **Produto desativado** | Produto que não pode mais ser vendido, mas continua registrado nas vendas antigas. | Produto excluído. |
 
 ---
 
@@ -47,9 +51,10 @@
 
 | Ator | Quem é | Pode | Não pode |
 | :--- | :----- | :--- | :------- |
-| **Operador de caixa** | Pessoa responsável por cadastrar dados e realizar as vendas no sistema. | Cadastrar produtos; cadastrar clientes e seus créditos; iniciar uma venda; localizar produtos por código ou nome; usar leitor de código de barras; definir quantidade; escolher a forma de pagamento; registrar pagamentos externos; acompanhar o estado da venda. | Aprovar uma venda por crédito quando o cliente não possui saldo suficiente; marcar uma venda como paga quando o pagamento PIX ainda não foi confirmado; alterar o saldo de crédito de forma que o sistema permita saldo negativo. |
+| **Gerente** | Pessoa responsável por administrar os cadastros do sistema. | Cadastrar, editar e desativar produtos; cadastrar clientes; adicionar crédito a clientes; cadastrar operadores. | Operar o caixa (montar venda e registrar pagamento); deixar o saldo de crédito de um cliente negativo. |
+| **Operador de caixa** | Pessoa responsável por realizar as vendas no sistema. | Iniciar uma venda; localizar produtos por código ou nome; usar leitor de código de barras; definir quantidade; identificar o cliente; escolher e trocar a forma de pagamento; registrar pagamentos externos; acompanhar, retomar ou cancelar venda pendente. | Cadastrar ou alterar produtos, clientes, crédito ou operadores; aprovar uma venda por crédito quando o cliente não possui saldo suficiente; marcar uma venda como paga quando o pagamento PIX ainda não foi confirmado; cancelar uma venda concluída. |
 
-> Nesta etapa não foi definida uma separação entre múltiplos perfis administrativos e operadores. Caso isso seja necessário, a decisão deverá ser registrada posteriormente.
+> Cada pessoa entra no sistema com o próprio acesso, e o papel do acesso define o que ela pode fazer (RN13).
 
 ## 🔗 3.1 Relações de negócio que o tema precisa comportar
 
@@ -64,7 +69,7 @@ Essas relações representam o núcleo do domínio sem definir banco, endpoints 
 
 ### US01 — Cadastrar produto · `Must Have` · `M` · Status: `🟡 Ready`
 
-**Como** operador de caixa, **eu quero** cadastrar um produto com suas informações comerciais **para que** ele possa ser encontrado e vendido no simulador de caixa.
+**Como** gerente, **eu quero** cadastrar um produto com suas informações comerciais **para que** ele possa ser encontrado e vendido no simulador de caixa.
 
 **Critérios de aceite:**
 
@@ -72,11 +77,11 @@ Essas relações representam o núcleo do domínio sem definir banco, endpoints 
 - [ ] **Dado** que o código de barras informado já pertence a outro produto, **quando** o operador tentar cadastrar o produto, **então** o cadastro é recusado e nenhum produto duplicado é criado.
 - [ ] **Dado** que uma informação obrigatória está ausente, **quando** o operador tentar concluir o cadastro, **então** o sistema informa o problema e mantém o cadastro sem concluir.
 
-**Regras relacionadas:** RN01, RN02
+**Regras relacionadas:** RN01, RN02, RN13
 
 ### US02 — Cadastrar cliente com crédito · `Must Have` · `M` · Status: `🟡 Ready`
 
-**Como** operador de caixa, **eu quero** cadastrar um cliente com um saldo inicial de crédito **para que** esse saldo possa ser usado como forma de pagamento nas vendas.
+**Como** gerente, **eu quero** cadastrar um cliente com um saldo inicial de crédito **para que** esse saldo possa ser usado como forma de pagamento nas vendas.
 
 **Critérios de aceite:**
 
@@ -84,7 +89,9 @@ Essas relações representam o núcleo do domínio sem definir banco, endpoints 
 - [ ] **Dado** que o saldo inicial informado é negativo, **quando** o operador tentar concluir o cadastro, **então** o sistema rejeita o cadastro e não cria um saldo negativo.
 - [ ] **Dado** que o operador tente pagar uma venda com crédito sem selecionar um cliente, **quando** confirmar essa forma de pagamento, **então** o sistema não conclui o pagamento e solicita a identificação do cliente.
 
-**Regras relacionadas:** RN03, RN04
+- [ ] **Dado** que o CPF informado já pertence a outro cliente, **quando** o gerente tentar concluir o cadastro, **então** o cadastro é recusado e nenhum cliente duplicado é criado.
+
+**Regras relacionadas:** RN03, RN04, RN13, RN14
 
 ### US03 — Montar venda no simulador de caixa · `Must Have` · `M` · Status: `🟡 Ready`
 
@@ -159,7 +166,70 @@ Essas relações representam o núcleo do domínio sem definir banco, endpoints 
 - [ ] **Dado** que a venda está sem forma de pagamento confirmada, **quando** o operador tentar concluir, **então** o sistema impede a conclusão.
 - [ ] **Dado** que uma venda pendente foi cancelada antes da confirmação do pagamento, **quando** o cancelamento for confirmado, **então** ela deixa de ser tratada como venda paga.
 
-**Regras relacionadas:** RN08, RN10, RN11
+**Regras relacionadas:** RN08, RN10, RN11, RN18
+
+### US09 — Entrar no sistema · `Must Have` · `M` · Status: `⚪ Draft`
+
+**Como** gerente ou operador de caixa, **eu quero** entrar no sistema com o meu acesso **para que** eu use somente as funções do meu papel.
+
+**Critérios de aceite:**
+
+- [ ] **Dado** um acesso válido, **quando** a pessoa entrar no sistema, **então** ela passa a usar o sistema com o papel do seu acesso e vê apenas as funções desse papel.
+- [ ] **Dado** um acesso inválido, **quando** a pessoa tentar entrar, **então** a entrada é recusada e a mensagem não revela qual dado está incorreto.
+- [ ] **Dado** um operador de caixa conectado, **quando** ele tentar usar uma função do gerente, **então** o sistema impede a ação.
+- [ ] **Dado** um gerente conectado, **quando** ele tentar operar o caixa, **então** o sistema impede a ação.
+
+**Regras relacionadas:** RN13
+
+### US10 — Cadastrar operador · `Must Have` · `S` · Status: `⚪ Draft`
+
+**Como** gerente, **eu quero** cadastrar operadores de caixa **para que** cada operador entre no sistema com o próprio acesso.
+
+**Critérios de aceite:**
+
+- [ ] **Dado** que os dados do operador são válidos, **quando** o gerente concluir o cadastro, **então** o operador consegue entrar no sistema com o papel de operador de caixa.
+- [ ] **Dado** que o acesso informado já pertence a outra pessoa, **quando** o gerente tentar concluir o cadastro, **então** o cadastro é recusado.
+- [ ] **Dado** um operador de caixa conectado, **quando** ele tentar cadastrar outro operador, **então** o sistema impede a ação.
+
+**Regras relacionadas:** RN13
+
+### US11 — Retomar ou cancelar venda pendente · `Must Have` · `M` · Status: `⚪ Draft`
+
+**Como** operador de caixa, **eu quero** consultar as vendas PIX pendentes e retomá-las ou cancelá-las **para que** uma venda abandonada no pagamento não fique esquecida nem seja tratada como paga.
+
+**Critérios de aceite:**
+
+- [ ] **Dado** que existem vendas PIX pendentes, **quando** o operador consultar as vendas pendentes, **então** o sistema apresenta cada uma com seu total e cliente, quando houver.
+- [ ] **Dado** uma venda pendente, **quando** o operador retomá-la, **então** o QR Code da mesma venda volta a ser apresentado e a venda continua pendente.
+- [ ] **Dado** uma venda pendente, **quando** o operador cancelá-la, **então** ela deixa de constar como pendente e nunca é tratada como paga.
+- [ ] **Dado** que não existem vendas pendentes, **quando** o operador consultar a lista, **então** o sistema informa que não há vendas pendentes.
+- [ ] **Dado** uma venda pendente, **quando** o operador trocar a forma de pagamento, **então** a tentativa PIX é abandonada e a venda segue para a nova forma escolhida.
+
+**Regras relacionadas:** RN10, RN12, RN17
+
+### US12 — Adicionar crédito ao cliente · `Must Have` · `S` · Status: `⚪ Draft`
+
+**Como** gerente, **eu quero** adicionar crédito a um cliente já cadastrado **para que** ele possa continuar usando o crédito como forma de pagamento.
+
+**Critérios de aceite:**
+
+- [ ] **Dado** um cliente cadastrado e um valor positivo, **quando** o gerente adicionar o crédito, **então** o saldo do cliente aumenta exatamente nesse valor.
+- [ ] **Dado** um valor zero ou negativo, **quando** o gerente tentar adicionar o crédito, **então** a operação é recusada e o saldo não é alterado.
+- [ ] **Dado** um operador de caixa conectado, **quando** ele tentar adicionar crédito, **então** o sistema impede a ação.
+
+**Regras relacionadas:** RN03, RN13, RN15
+
+### US13 — Editar ou desativar produto · `Should Have` · `M` · Status: `⚪ Draft`
+
+**Como** gerente, **eu quero** editar ou desativar um produto cadastrado **para que** o catálogo do caixa reflita os preços e itens atuais.
+
+**Critérios de aceite:**
+
+- [ ] **Dado** um produto cadastrado, **quando** o gerente alterar o preço, **então** as novas vendas usam o novo preço e as vendas já registradas mantêm o preço aplicado na época.
+- [ ] **Dado** que o novo código de barras já pertence a outro produto, **quando** o gerente tentar salvar a edição, **então** a alteração é recusada.
+- [ ] **Dado** um produto desativado, **quando** o operador tentar localizá-lo ou incluí-lo em uma venda, **então** o produto não é encontrado e nenhum item é adicionado.
+
+**Regras relacionadas:** RN01, RN13, RN16
 
 ---
 
@@ -179,6 +249,12 @@ Essas relações representam o núcleo do domínio sem definir banco, endpoints 
 | RN10 | Uma venda só pode ser tratada como paga quando a forma de pagamento tiver uma confirmação válida: crédito do cliente com saldo suficiente, PIX confirmado ou confirmação do operador para crédito/débito externo. |
 | RN11 | Crédito e débito realizados em máquina externa não são controlados pelo sistema; o sistema apenas registra o resultado informado pelo operador. |
 | RN12 | Uma venda PIX sem confirmação permanece pendente e não deve ser tratada como paga. |
+| RN13 | Somente o gerente cadastra e altera produtos, clientes, crédito e operadores; somente o operador de caixa opera o caixa. |
+| RN14 | O cliente deve possuir nome e CPF; o CPF é único entre os clientes. |
+| RN15 | Um crédito adicionado a um cliente deve ser um valor positivo. |
+| RN16 | Produto desativado não pode ser incluído em vendas; cada item de venda guarda o preço aplicado no momento da inclusão. |
+| RN17 | Uma venda PIX pendente não expira: permanece pendente até ser confirmada, cancelada ou ter a forma de pagamento trocada. |
+| RN18 | Uma venda concluída não pode ser cancelada. |
 
 ---
 
@@ -189,7 +265,11 @@ Essas relações representam o núcleo do domínio sem definir banco, endpoints 
 - **Emissão fiscal ou integração com documentos fiscais.** Não faz parte do objetivo desta etapa/produto.
 - **Controle de estoque, compras de fornecedor e entrada de mercadoria.** O cadastro de produto existe para permitir o registro das vendas.
 - **Programa de descontos, cupons ou promoções.** O total da venda, nesta versão, é formado pelos preços cadastrados e pelas quantidades informadas.
-- **Gestão de múltiplos níveis administrativos.** Nesta definição inicial existe um único ator operacional.
+- **Mais papéis além de gerente e operador de caixa.** Os dois papéis cobrem a separação entre cadastro e venda.
+- **Extrato de crédito do cliente.** O sistema mostra apenas o saldo atual.
+- **Registro de NSU ou comprovante do cartão externo.** O operador informa apenas se a máquina aprovou ou não.
+- **Expiração automática do PIX.** A venda pendente só sai desse estado por confirmação, cancelamento ou troca da forma de pagamento.
+- **Estorno ou cancelamento de venda concluída.** Uma venda paga não é desfeita pelo sistema.
 - **Relatórios gerenciais e análise de vendas.** Podem ser avaliados posteriormente, caso o escopo permita.
 
 ---
@@ -203,8 +283,15 @@ Essas relações representam o núcleo do domínio sem definir banco, endpoints 
 
 ---
 
+## ❓ Dúvidas em aberto
+
+- Se um PIX abandonado pela troca da forma de pagamento for confirmado depois, o que acontece com o valor recebido? A venda não pode ser paga duas vezes.
+
+---
+
 ## 🛠️ 8. Histórico
 
 | Data | Versão | O que mudou |
 | :--- | :----- | :---------- |
 | 20/09/2026 | 1.0.0 | Definição inicial do tema Bleep Checkout, escopo funcional, regras de negócio e formas de pagamento. |
+| 08/10/2026 | 1.1.0 | Atores gerente e operador de caixa; US01 e US02 passam ao gerente; CPF único em US02; novas US09–US13 (Draft); RN13–RN18; venda PIX pendente não expira; fora de escopo ampliado. |
