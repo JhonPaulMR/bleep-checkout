@@ -1,10 +1,10 @@
 # 🎨 Tokens de Design
 
 **Projeto:** Bleep Checkout
-**Versão:** 1.1.0 · revisão com o protótipo no Figma
+**Versão:** 1.2.0 · tokens conferidos contra o protótipo clicável no Stitch
 **Última atualização:** 08/10/2026
 
-> Esta versão revisa a proposta inicial a partir do protótipo no Figma, incluindo as telas novas: login, clientes e crédito, busca por nome, estados de erro, conclusão da venda e vendas pendentes.
+> Esta versão confere os tokens com o protótipo no Stitch, que cobre todas as stories Must Have do `prd.md` v1.1. Também alinha os estados da venda à RN17: a venda PIX pendente não expira.
 
 ## Paleta
 
@@ -17,9 +17,9 @@ Nome semântico, nunca baseado apenas na aparência da cor.
 | `superficie` | `#FFFFFF` | fundo de cards, painéis, modais e áreas de formulário |
 | `texto` | `#111827` | texto principal e informações essenciais |
 | `texto-suave` | `#6B7280` | legendas, valores auxiliares e mensagens de apoio |
-| `perigo` | `#DC2626` | erros, campo inválido, cancelamento, venda cancelada/expirada e situações que impedem a operação |
+| `perigo` | `#DC2626` | erros, campo inválido, cancelamento, venda cancelada e situações que impedem a operação |
 | `sucesso` | `#16A34A` | confirmações, saldo disponível, venda concluída e pagamento confirmado |
-| `alerta` | `#D97706` | estado pendente: venda aguardando confirmação do PIX e contador de expiração |
+| `alerta` | `#D97706` | estado pendente: venda aguardando confirmação do PIX |
 | `desabilitado` | `#D1D5DB` | controles indisponíveis e ações temporariamente bloqueadas |
 
 ### Estados da venda
@@ -31,19 +31,19 @@ O operador precisa distinguir os estados da venda (RNF "Clareza de estado"). Cad
 | Aberta | `primaria` | carrinho · "Venda aberta" |
 | Pendente | `alerta` | relógio · "Pendente — aguardando pagamento" |
 | Concluída | `sucesso` | check · "Concluída" |
-| Cancelada / Expirada | `perigo` | X · "Cancelada" / "Expirada — nenhum valor recebido" |
+| Cancelada | `perigo` | X · "Cancelada — nenhum valor recebido" |
 
 ## Escala de espaçamento
 
-Uma única progressão, usada de forma consistente.
+Uma única progressão, usada de forma consistente. A unidade é `rem`, para os espaços crescerem junto quando a pessoa aumenta o texto no navegador. Entre parênteses, o equivalente com a fonte padrão de 16px.
 
 | Token | Valor |
 | --- | --- |
-| `xs` | `4px` |
-| `sm` | `8px` |
-| `md` | `16px` |
-| `lg` | `24px` |
-| `xl` | `32px` |
+| `xs` | `0,25rem` (4px) |
+| `sm` | `0,5rem` (8px) |
+| `md` | `1rem` (16px) |
+| `lg` | `1,5rem` (24px) |
+| `xl` | `2rem` (32px) |
 
 ## Tipografia
 
@@ -63,7 +63,7 @@ Uma única progressão, usada de forma consistente.
 | Variante | Cor | Onde se usa |
 | --- | --- | --- |
 | `primario` | fundo `primaria` | ação principal da tela: Adicionar, Prosseguir para pagamento, Gerar QR Code PIX, Salvar, Entrar |
-| `secundario` | contornado, texto `primaria` | ações de apoio: Voltar ao caixa, Trocar forma de pagamento, Buscar por nome, Simular confirmação (somente sandbox) |
+| `secundario` | contornado, texto `primaria` | ações de apoio: Voltar ao caixa, Trocar forma de pagamento, Buscar por nome, Sair, Simular confirmação (somente sandbox) |
 | `perigo` | `perigo` | Cancelar venda, Não aprovado na máquina |
 | `sucesso` | `sucesso` | Aprovado na máquina |
 
@@ -79,19 +79,24 @@ Uma única progressão, usada de forma consistente.
 
 ## Protótipo
 
-**Link Figma:** [Acesse aqui](https://www.figma.com/design/JzDrcL9BrkwvHXS7fEX9N4/Untitled?node-id=0-1)
+**Link público do protótipo (Stitch):** ⏳ *pendente — o aluno publica o projeto com acesso "qualquer pessoa com o link" e registra aqui.*
 
-**Telas, ligadas às jornadas e stories:**
+**Arquivo auxiliar de ajustes (Figma):** [arquivo de design](https://www.figma.com/design/JzDrcL9BrkwvHXS7fEX9N4/Untitled?node-id=0-1). Serve só para consertos pontuais; a entrega é o link do Stitch.
 
-1. Login: acesso de operador ou gerente.
-2. Simulador de caixa (PDV): código de barras, leitor, quantidade e carrinho (US03, US04).
-3. Busca de produto por nome, com o estado "nenhum produto encontrado" (US03).
-4. Estados de erro no caixa: produto não localizado, quantidade inválida, saldo insuficiente (US03, US04, US05).
-5. Produtos: listagem e cadastro, com erro de código duplicado (US01).
-6. Clientes e crédito: cadastro com saldo inicial, erro de saldo negativo e extrato (US02).
-7. Pagamento: PIX, crédito do cliente, crédito externo e débito externo (US05, US06, US07).
-8. Acompanhamento PIX: pendente e expirado. É a Jornada 1 de `user-flows.md` (US06).
-9. Conclusão da venda: concluída, pendente e cancelada/expirada (US08).
-10. Vendas pendentes: retomar ou cancelar um PIX pendente.
+**Telas e cobertura das stories Must Have:**
 
-> As telas 1 e 10 dependem de decisões ainda não registradas no `prd.md`: a story de login com papéis e a regra de expiração/retomada da venda PIX pendente. Essas decisões entram pelo `/utf-prd`.
+| Tela | Quem usa | Stories |
+| --- | --- | --- |
+| Login | Gerente e Operador | US09 |
+| Simulador de Caixa (PDV) | Operador | US03, US04 |
+| Caixa: Busca de Produto por Nome (com "nenhum produto encontrado") | Operador | US03 |
+| Caixa: Estados de Erro (produto não localizado, quantidade inválida, saldo insuficiente) | Operador | US03, US04, US05 |
+| Pagamento (PIX, crédito do cliente, crédito externo e débito externo) | Operador | US05, US07 |
+| Acompanhamento PIX: nó vermelho da Jornada 1 (abandono → venda continua pendente) | Operador | US06 |
+| Conclusão da Venda (concluída, pendente, cancelada) | Operador | US08 |
+| Vendas Pendentes (retomar ou cancelar, com estado vazio) | Operador | US11 |
+| Produtos (cadastro com erro de código duplicado) | Gerente | US01 |
+| Clientes & Crédito (cadastro com CPF único, adicionar crédito com erro de valor ≤ 0) | Gerente | US02, US12 |
+| Operadores (cadastro com erro de acesso duplicado) | Gerente | US10 |
+
+O menu de cada tela segue o papel (RN13): o Operador vê **Caixa · Pendentes**; o Gerente vê **Produtos · Clientes · Operadores**. Todas as telas têm **Sair**, que volta ao Login.
