@@ -168,7 +168,7 @@ Essas relações representam o núcleo do domínio sem definir banco, endpoints 
 
 **Regras relacionadas:** RN08, RN10, RN11, RN18
 
-### US09 — Entrar no sistema · `Must Have` · `M` · Status: `⚪ Draft`
+### US09 — Entrar no sistema · `Must Have` · `M` · Status: `🟡 Ready`
 
 **Como** gerente ou operador de caixa, **eu quero** entrar no sistema com o meu acesso **para que** eu use somente as funções do meu papel.
 
@@ -181,7 +181,7 @@ Essas relações representam o núcleo do domínio sem definir banco, endpoints 
 
 **Regras relacionadas:** RN13
 
-### US10 — Cadastrar operador · `Must Have` · `S` · Status: `⚪ Draft`
+### US10 — Cadastrar operador · `Must Have` · `S` · Status: `🟡 Ready`
 
 **Como** gerente, **eu quero** cadastrar operadores de caixa **para que** cada operador entre no sistema com o próprio acesso.
 
@@ -193,7 +193,7 @@ Essas relações representam o núcleo do domínio sem definir banco, endpoints 
 
 **Regras relacionadas:** RN13
 
-### US11 — Retomar ou cancelar venda pendente · `Must Have` · `M` · Status: `⚪ Draft`
+### US11 — Retomar ou cancelar venda pendente · `Must Have` · `M` · Status: `🟡 Ready`
 
 **Como** operador de caixa, **eu quero** consultar as vendas PIX pendentes e retomá-las ou cancelá-las **para que** uma venda abandonada no pagamento não fique esquecida nem seja tratada como paga.
 
@@ -207,7 +207,7 @@ Essas relações representam o núcleo do domínio sem definir banco, endpoints 
 
 **Regras relacionadas:** RN10, RN12, RN17
 
-### US12 — Adicionar crédito ao cliente · `Must Have` · `S` · Status: `⚪ Draft`
+### US12 — Adicionar crédito ao cliente · `Must Have` · `S` · Status: `🟡 Ready`
 
 **Como** gerente, **eu quero** adicionar crédito a um cliente já cadastrado **para que** ele possa continuar usando o crédito como forma de pagamento.
 
@@ -219,7 +219,7 @@ Essas relações representam o núcleo do domínio sem definir banco, endpoints 
 
 **Regras relacionadas:** RN03, RN13, RN15
 
-### US13 — Editar ou desativar produto · `Should Have` · `M` · Status: `⚪ Draft`
+### US13 — Editar ou desativar produto · `Should Have` · `M` · Status: `🟡 Ready`
 
 **Como** gerente, **eu quero** editar ou desativar um produto cadastrado **para que** o catálogo do caixa reflita os preços e itens atuais.
 
