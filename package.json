@@ -1,0 +1,15 @@
+{
+  "name": "bleep-checkout",
+  "private": true,
+  "description": "Monorepo do Bleep Checkout: apps/api (NestJS) e apps/web (Angular). Só scripts de orquestração; cada app tem o seu package.json.",
+  "scripts": {
+    "install:all": "npm --prefix apps/api install && npm --prefix apps/web install",
+    "db:up": "docker compose up -d",
+    "db:down": "docker compose down",
+    "api": "npm --prefix apps/api run start:dev",
+    "web": "npm --prefix apps/web start",
+    "test": "npm --prefix apps/api test && npm --prefix apps/web test -- --watch=false",
+    "lint": "npm --prefix apps/api run lint && npm --prefix apps/web run lint",
+    "test:e2e": "npm --prefix apps/api run test:e2e"
+  }
+}

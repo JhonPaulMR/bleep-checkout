@@ -1,0 +1,21 @@
+# Dependências
+node_modules/
+
+# Build e cache
+dist/
+build/
+.angular/
+coverage/
+out-tsc/
+*.tsbuildinfo
+
+# Variáveis de ambiente (só o .env.example vai para o repositório)
+.env
+.env.*
+!.env.example
+
+# Logs e sistema
+*.log
+npm-debug.log*
+.DS_Store
+Thumbs.db
