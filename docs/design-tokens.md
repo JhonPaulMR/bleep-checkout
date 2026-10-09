@@ -79,7 +79,18 @@ Uma única progressão, usada de forma consistente. A unidade é `rem`, para os 
 
 ## Protótipo
 
-**Link público do protótipo (Stitch):** ⏳ *pendente — o aluno publica o projeto com acesso "qualquer pessoa com o link" e registra aqui.*
+**Link público do protótipo:** [jhonpaulmr.github.io/bleep-prototipo](https://jhonpaulmr.github.io/bleep-prototipo/). Abre sem login e dá para percorrer a jornada só clicando.
+
+**Fonte das telas (Stitch):** [projeto no Stitch](https://stitch.google.com/preview/3188655804959236628). O Stitch exige uma conta Google até para projetos públicos. Por isso o HTML exportado das telas está publicado no repositório [bleep-prototipo](https://github.com/JhonPaulMR/bleep-prototipo), com a navegação ligada.
+
+**Jornada para conferir:**
+1. Login → Entrar
+2. Caixa → Prosseguir para pagamento
+3. Pagamento → Gerar QR Code PIX
+4. Acompanhamento PIX → Voltar ao caixa (nó vermelho: a venda continua pendente)
+5. Pendentes → Retomar
+
+As telas do Gerente abrem por "Entrar como Gerente (demonstração)". O botão **Mapa do protótipo** lista todas as telas.
 
 **Arquivo auxiliar de ajustes (Figma):** [arquivo de design](https://www.figma.com/design/JzDrcL9BrkwvHXS7fEX9N4/Untitled?node-id=0-1). Serve só para consertos pontuais; a entrega é o link do Stitch.
 
