@@ -1,0 +1,23 @@
+# PostgreSQL local para desenvolvimento e testes e2e (docs/architecture.md §5.3).
+# As credenciais abaixo valem só para este banco local e descartável;
+# o banco de produção (Neon) é configurado nos secrets da plataforma.
+services:
+  db:
+    image: postgres:17
+    container_name: bleep-checkout-db
+    environment:
+      POSTGRES_USER: bleep
+      POSTGRES_PASSWORD: bleep
+      POSTGRES_DB: bleep_checkout
+    ports:
+      - "5432:5432"
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bleep -d bleep_checkout"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  db-data:

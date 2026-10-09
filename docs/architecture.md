@@ -1,7 +1,7 @@
 # 🛠️ Architecture / Software Design Document
 
 **Projeto:** Bleep Checkout
-**Versão:** 1.0.0 · decisões da Atividade 07
+**Versão:** 1.0.1 · decisões da Atividade 07 + ratificação do `/utf-setup`
 **Última atualização:** 08/10/2026
 
 > 🤖 **O `prd.md` responde _o quê_ o produto faz. Este responde _onde as coisas
@@ -50,7 +50,8 @@
   | `apps/api` | **Vitest** | Unidade: services e regras de domínio, sem banco |
   | `apps/api` | **Vitest + Supertest** | e2e: HTTP → banco real (Postgres do Docker) |
   | `apps/web` | **Vitest** (padrão do `ng test` no Angular 22+) | Services e componentes |
-  | ambos | **ESLint** (`angular-eslint` no web) | Lint |
+  | `apps/api` | **oxlint** (padrão do gerador do NestJS 12+) | Lint |
+  | `apps/web` | **ESLint** com `angular-eslint` (via `ng add`) | Lint |
 
   **Comandos exatos**, a partir da raiz:
 
@@ -279,6 +280,7 @@ erDiagram
 | Data | Versão | O que mudou |
 | :--- | :----- | :---------- |
 | 08/10/2026 | 1.0.0 | Versão inicial via `/utf-architecture`: Angular 22+, NestJS 12+ + Prisma 7+ + PostgreSQL 17+, Neon, Render, Vercel, Mercado Pago sandbox |
+| 09/10/2026 | 1.0.1 | `/utf-setup`: lint da API ratificado como **oxlint**, o padrão do gerador do NestJS 12+; o web segue com ESLint (`angular-eslint`) |
 
 ---
 
