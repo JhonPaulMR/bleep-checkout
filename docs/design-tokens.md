@@ -92,7 +92,7 @@ Uma única progressão, usada de forma consistente. A unidade é `rem`, para os 
 
 As telas do Gerente abrem por "Entrar como Gerente (demonstração)". O botão **Mapa do protótipo** lista todas as telas.
 
-**Arquivo auxiliar de ajustes (Figma):** [arquivo de design](https://www.figma.com/design/JzDrcL9BrkwvHXS7fEX9N4/Untitled?node-id=0-1). Serve só para consertos pontuais; a entrega é o link do Stitch.
+**Arquivo auxiliar de ajustes (Figma):** [arquivo de design](https://www.figma.com/design/JzDrcL9BrkwvHXS7fEX9N4/Untitled?node-id=0-1). Serve só para consertos pontuais; a entrega é o link público do protótipo, acima.
 
 **Telas e cobertura das stories Must Have:**
 
