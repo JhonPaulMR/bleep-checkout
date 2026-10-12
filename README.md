@@ -13,7 +13,12 @@ O Bleep Checkout resolve a necessidade de registrar produtos e clientes, montar 
 - [PRD — requisitos do produto](docs/prd.md)
 - [Jornadas de usuário](docs/user-flows.md)
 - [Tokens de design](docs/design-tokens.md)
+- [Arquitetura](docs/architecture.md)
 - [Checklist da disciplina](docs/checklist.md)
+
+## Protótipo
+
+- [Protótipo navegável](https://jhonpaulmr.github.io/bleep-prototipo/) — abre sem login; o botão **Mapa do protótipo** lista todas as telas.
 
 ## Stack
 
@@ -24,9 +29,8 @@ O Bleep Checkout resolve a necessidade de registrar produtos e clientes, montar 
 
 ## Em produção
 
-- **Aplicação:** ainda não disponível nesta etapa.
-- **API:** ainda não disponível nesta etapa.
+A partir da Entrega 3.
 
 ## Quick Start
 
-Ainda não se aplica nesta etapa de definição do produto.
+A partir da Entrega 2.
