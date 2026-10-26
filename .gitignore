@@ -3,6 +3,7 @@ node_modules/
 
 # Build e cache
 dist/
+apps/api/generated/
 build/
 .angular/
 coverage/

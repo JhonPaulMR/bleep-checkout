@@ -1,8 +1,8 @@
 # 🛠️ Architecture / Software Design Document
 
 **Projeto:** Bleep Checkout
-**Versão:** 1.0.1 · decisões da Atividade 07 + ratificação do `/utf-setup`
-**Última atualização:** 08/10/2026
+**Versão:** 1.0.2 · decisões da Atividade 07 + ratificação do `/utf-setup` + fechamento da Atividade 08
+**Última atualização:** 25/10/2026
 
 > 🤖 **O `prd.md` responde _o quê_ o produto faz. Este responde _onde as coisas
 > moram e como se chamam_.** Detalhe de tela — rota, componente, contrato —
@@ -33,6 +33,7 @@
 > Linhas conferidas em 08/10/2026 no registro do npm.
 
 - **Ambiente:** Node.js **24+ (LTS)**. O Angular 22+ não instala em Node 22 anterior à 22.22.
+- **Módulos:** **ESM** (`"type": "module"` no `apps/api`), o padrão do gerador do NestJS 12+. Teste é `vi.fn()`, não `jest.fn()`.
 - **Backend:** **NestJS 12+** + **Prisma ORM 7+** (driver `@prisma/adapter-pg`) + **PostgreSQL 17+**.
   - Dependências do backend: `@nestjs/config`, `@nestjs/jwt`, `@nestjs/swagger`, `class-validator`, `class-transformer`, `argon2` (hash de senha) e `mercadopago` (SDK oficial, sandbox).
 - **Frontend:** **Angular 22+**.
@@ -94,9 +95,12 @@
 
 ## 🗂️ 3. Estrutura do Repositório (Monorepo)
 
-> Uma pasta por aplicação, cada uma com o seu `package.json`. Sem npm
-> workspaces, Nx ou Turborepo enquanto não houver código compartilhado de
-> verdade — ferramenta sem problema para resolver é só custo.
+> Uma pasta por aplicação, cada uma com o seu `package.json`, amarradas por
+> **npm workspaces** (`"workspaces": ["apps/*"]` no `package.json` da raiz):
+> um `npm install` na raiz instala os dois apps e existe **um único**
+> `package-lock.json`, na raiz — é o que o `npm ci` do CI espera. Sem Nx ou
+> Turborepo enquanto não houver código compartilhado de verdade — ferramenta
+> sem problema para resolver é só custo.
 
 ```text
 .
@@ -106,13 +110,14 @@
 ├── CLAUDE.md  AGENTS.md   # carregam a constituição em toda sessão
 ├── README.md              # a vitrine: o que é e como rodar
 ├── docker-compose.yml     # Postgres 17+ local (dev e e2e)
-├── package.json           # só scripts que chamam os apps (test, lint, test:e2e)
+├── package.json           # workspaces (apps/*) + scripts com -w (test, lint, test:e2e)
 ├── docs/                  # prd.md, user-flows.md, design-tokens.md, este arquivo, checklist.md e guias
 ├── specs/                 # uma pasta por história implementada
 └── apps/
     ├── api/               # NestJS 12+ + Prisma 7+
     │   ├── prisma/        # schema.prisma + migrations/
-    │   ├── prisma.config.ts
+    │   ├── generated/     # cliente gerado pelo Prisma — fora do Git
+    │   ├── prisma.config.ts   # carrega o .env via dotenv (a CLI do Prisma 7 não lê sozinha)
     │   ├── src/
     │   │   ├── common/    # ResponseInterceptor, HttpExceptionFilter, guards, @Roles, @Public, erros de domínio
     │   │   ├── config/    # ConfigModule + validação das variáveis
@@ -281,6 +286,7 @@ erDiagram
 | :--- | :----- | :---------- |
 | 08/10/2026 | 1.0.0 | Versão inicial via `/utf-architecture`: Angular 22+, NestJS 12+ + Prisma 7+ + PostgreSQL 17+, Neon, Render, Vercel, Mercado Pago sandbox |
 | 09/10/2026 | 1.0.1 | `/utf-setup`: lint da API ratificado como **oxlint**, o padrão do gerador do NestJS 12+; o web segue com ESLint (`angular-eslint`) |
+| 25/10/2026 | 1.0.2 | Fechamento da Atividade 08: adoção de **npm workspaces** (revoga o "sem workspaces" da 1.0.0, exigido pelo `npm install` único e pelo `npm ci` do CI), ESM ratificado, Prisma 7 + `@nestjs/config` instalados sem nenhum `model`, `.env.example` com `DATABASE_URL` e `DIRECT_URL` |
 
 ---
 
