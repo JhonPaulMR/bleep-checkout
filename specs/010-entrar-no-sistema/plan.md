@@ -22,7 +22,7 @@
   - Teste primeiro: e2e que, depois do seed, encontra um `User` `MANAGER` e um `OPERATOR` com `passwordHash` diferente da senha em texto; falha porque não há `model` nem seed
   - Arquivos previstos: `apps/api/prisma/schema.prisma`, `apps/api/prisma/migrations/…`, `apps/api/prisma/seed.ts`, `apps/api/prisma.config.ts`, `apps/api/src/prisma/prisma.service.ts`, `apps/api/src/prisma/prisma.module.ts`, `apps/api/src/config/env.validation.ts`, `apps/api/src/app.module.ts`, `apps/api/.env.example`, `apps/api/test/seed.e2e-spec.ts`
 
-- [ ] **Tarefa 2 — Entrar com acesso válido na API**
+- [x] **Tarefa 2 — Entrar com acesso válido na API**
   - Cobre: CA1 (lado da API)
   - Teste primeiro: unit do `AuthService` (senha correta devolve token com `sub` e `role`) e e2e `POST /auth/login` com o gerente do seed → 200 com `{ data: { accessToken, user: { name, role: "MANAGER" } } }` e sem `passwordHash`; falham porque o módulo não existe
   - Arquivos previstos: `apps/api/src/modules/auth/*`, `apps/api/src/modules/users/*`, `apps/api/src/common/interceptors/response.interceptor.ts`, `apps/api/src/common/decorators/public.decorator.ts`, `apps/api/src/main.ts`, `apps/api/test/auth.e2e-spec.ts`
