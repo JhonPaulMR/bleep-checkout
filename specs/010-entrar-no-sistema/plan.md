@@ -17,7 +17,7 @@
 
 ## Tarefas
 
-- [ ] **Tarefa 1 — Guardar acessos no banco com seed inicial**
+- [x] **Tarefa 1 — Guardar acessos no banco com seed inicial**
   - Cobre: pré-requisito de CA1 (passo técnico)
   - Teste primeiro: e2e que, depois do seed, encontra um `User` `MANAGER` e um `OPERATOR` com `passwordHash` diferente da senha em texto; falha porque não há `model` nem seed
   - Arquivos previstos: `apps/api/prisma/schema.prisma`, `apps/api/prisma/migrations/…`, `apps/api/prisma/seed.ts`, `apps/api/prisma.config.ts`, `apps/api/src/prisma/prisma.service.ts`, `apps/api/src/prisma/prisma.module.ts`, `apps/api/src/config/env.validation.ts`, `apps/api/src/app.module.ts`, `apps/api/.env.example`, `apps/api/test/seed.e2e-spec.ts`
