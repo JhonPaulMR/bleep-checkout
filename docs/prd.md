@@ -1,7 +1,7 @@
 # 📄 Product Requirements Document (PRD)
 
 **Projeto:** Bleep Checkout
-**Versão:** 1.1.0 · papéis de acesso, venda pendente e cadastros do gerente
+**Versão:** 1.1.1 · papéis de acesso, venda pendente e cadastros do gerente
 **Última atualização:** 08/10/2026
 
 > 🤖 **Este documento é a fonte da verdade sobre o QUE o produto faz.** Regra de
@@ -73,9 +73,9 @@ Essas relações representam o núcleo do domínio sem definir banco, endpoints 
 
 **Critérios de aceite:**
 
-- [ ] **Dado** que o produto possui as informações obrigatórias, **quando** o operador concluir o cadastro, **então** o produto passa a estar disponível para busca e inclusão em vendas.
-- [ ] **Dado** que o código de barras informado já pertence a outro produto, **quando** o operador tentar cadastrar o produto, **então** o cadastro é recusado e nenhum produto duplicado é criado.
-- [ ] **Dado** que uma informação obrigatória está ausente, **quando** o operador tentar concluir o cadastro, **então** o sistema informa o problema e mantém o cadastro sem concluir.
+- [ ] **Dado** que o produto possui as informações obrigatórias, **quando** o gerente concluir o cadastro, **então** o produto passa a estar disponível para busca e inclusão em vendas.
+- [ ] **Dado** que o código de barras informado já pertence a outro produto, **quando** o gerente tentar cadastrar o produto, **então** o cadastro é recusado e nenhum produto duplicado é criado.
+- [ ] **Dado** que uma informação obrigatória está ausente, **quando** o gerente tentar concluir o cadastro, **então** o sistema informa o problema e mantém o cadastro sem concluir.
 
 **Regras relacionadas:** RN01, RN02, RN13
 
@@ -85,8 +85,8 @@ Essas relações representam o núcleo do domínio sem definir banco, endpoints 
 
 **Critérios de aceite:**
 
-- [ ] **Dado** que o cliente foi informado com seus dados obrigatórios e um saldo inicial válido, **quando** o operador concluir o cadastro, **então** o cliente fica disponível para seleção em uma venda e seu crédito fica registrado.
-- [ ] **Dado** que o saldo inicial informado é negativo, **quando** o operador tentar concluir o cadastro, **então** o sistema rejeita o cadastro e não cria um saldo negativo.
+- [ ] **Dado** que o cliente foi informado com seus dados obrigatórios e um saldo inicial válido, **quando** o gerente concluir o cadastro, **então** o cliente fica disponível para seleção em uma venda e seu crédito fica registrado.
+- [ ] **Dado** que o saldo inicial informado é negativo, **quando** o gerente tentar concluir o cadastro, **então** o sistema rejeita o cadastro e não cria um saldo negativo.
 - [ ] **Dado** que o operador tente pagar uma venda com crédito sem selecionar um cliente, **quando** confirmar essa forma de pagamento, **então** o sistema não conclui o pagamento e solicita a identificação do cliente.
 
 - [ ] **Dado** que o CPF informado já pertence a outro cliente, **quando** o gerente tentar concluir o cadastro, **então** o cadastro é recusado e nenhum cliente duplicado é criado.
@@ -295,3 +295,4 @@ Essas relações representam o núcleo do domínio sem definir banco, endpoints 
 | :--- | :----- | :---------- |
 | 20/09/2026 | 1.0.0 | Definição inicial do tema Bleep Checkout, escopo funcional, regras de negócio e formas de pagamento. |
 | 08/10/2026 | 1.1.0 | Atores gerente e operador de caixa; US01 e US02 passam ao gerente; CPF único em US02; novas US09–US13 (Draft); RN13–RN18; venda PIX pendente não expira; fora de escopo ampliado. |
+| 26/10/2026 | 1.1.1 | Critérios de aceite da US01 e da US02 passam a citar o gerente como ator, alinhados à RN13 e à v1.1 (#22). |
