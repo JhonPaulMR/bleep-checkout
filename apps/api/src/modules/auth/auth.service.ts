@@ -27,6 +27,18 @@ export class AuthService {
       role: user.role,
     });
 
-    return { accessToken, user: { name: user.name, role: user.role } };
+    return { accessToken, user: this.perfil(user) };
+  }
+
+  async me(userId: string) {
+    const user = await this.users.findById(userId);
+    if (!user) {
+      throw new UnauthorizedException('Sessão inválida ou expirada.');
+    }
+    return this.perfil(user);
+  }
+
+  private perfil(user: { name: string; role: string }) {
+    return { name: user.name, role: user.role };
   }
 }

@@ -37,7 +37,7 @@
   - Teste primeiro: e2e com e-mail vazio, e-mail inválido, senha vazia e campo extra → 400; falha porque não há DTO nem `ValidationPipe`
   - Arquivos previstos: `apps/api/src/modules/auth/dto/login.dto.ts`, `apps/api/src/main.ts` (`ValidationPipe` global e Swagger em `/docs`), `apps/api/test/auth.e2e-spec.ts`
 
-- [ ] **Tarefa 5 — Barrar token ausente ou vencido na API**
+- [x] **Tarefa 5 — Barrar token ausente ou vencido na API**
   - Cobre: CA6 (lado da API: "nenhuma ação é feita com a sessão vencida")
   - Teste primeiro: e2e `GET /auth/me` sem token, com token adulterado e com token vencido → 401; com token válido → 200 `{ data: { name, role } }`; falha porque não há guard nem rota
   - Arquivos previstos: `apps/api/src/common/guards/jwt-auth.guard.ts`, `apps/api/src/modules/auth/auth.controller.ts`, `apps/api/src/app.module.ts`, `apps/api/test/auth.e2e-spec.ts`
