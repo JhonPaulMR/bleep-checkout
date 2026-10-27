@@ -32,7 +32,7 @@
   - Teste primeiro: e2e com e-mail inexistente e com senha errada → os dois 401 com a mesma `message` no formato `{ statusCode, error, message, path, timestamp }`; falha porque não há filtro nem recusa
   - Arquivos previstos: `apps/api/src/modules/auth/auth.service.ts`, `apps/api/src/common/filters/http-exception.filter.ts`, `apps/api/src/main.ts`, `apps/api/test/auth.e2e-spec.ts`
 
-- [ ] **Tarefa 4 — Rejeitar entrada malformada na API**
+- [x] **Tarefa 4 — Rejeitar entrada malformada na API**
   - Cobre: CA3 (lado da API)
   - Teste primeiro: e2e com e-mail vazio, e-mail inválido, senha vazia e campo extra → 400; falha porque não há DTO nem `ValidationPipe`
   - Arquivos previstos: `apps/api/src/modules/auth/dto/login.dto.ts`, `apps/api/src/main.ts` (`ValidationPipe` global e Swagger em `/docs`), `apps/api/test/auth.e2e-spec.ts`

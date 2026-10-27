@@ -38,6 +38,42 @@ describe('Entrar no sistema (e2e)', () => {
     expect(JSON.stringify(response.body)).not.toContain('passwordHash');
   });
 
+  describe('POST /auth/login com entrada malformada', () => {
+    const enviar = (body: Record<string, unknown>) =>
+      request(app.getHttpServer()).post('/auth/login').send(body);
+
+    it.each([
+      ['e-mail vazio', { email: '', password: 'qualquer-senha' }],
+      [
+        'e-mail inválido',
+        { email: 'nao-e-email', password: 'qualquer-senha' },
+      ],
+      ['senha vazia', { email: 'ninguem@exemplo.com', password: '' }],
+      [
+        'campo extra',
+        {
+          email: 'ninguem@exemplo.com',
+          password: 'qualquer-senha',
+          role: 'MANAGER',
+        },
+      ],
+    ])('recusa %s com 400 no formato de erro', async (_caso, body) => {
+      const response = await enviar(body).expect(400);
+
+      expect(Object.keys(response.body).sort()).toEqual([
+        'error',
+        'message',
+        'path',
+        'statusCode',
+        'timestamp',
+      ]);
+      expect(response.body.statusCode).toBe(400);
+      expect(response.body.error).toBe('Bad Request');
+      expect(Array.isArray(response.body.message)).toBe(true);
+      expect(response.body.path).toBe('/auth/login');
+    });
+  });
+
   describe('POST /auth/login com acesso inválido', () => {
     const recusar = (email: string | undefined, password: string) =>
       request(app.getHttpServer())
