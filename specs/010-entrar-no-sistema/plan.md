@@ -27,7 +27,7 @@
   - Teste primeiro: unit do `AuthService` (senha correta devolve token com `sub` e `role`) e e2e `POST /auth/login` com o gerente do seed → 200 com `{ data: { accessToken, user: { name, role: "MANAGER" } } }` e sem `passwordHash`; falham porque o módulo não existe
   - Arquivos previstos: `apps/api/src/modules/auth/*`, `apps/api/src/modules/users/*`, `apps/api/src/common/interceptors/response.interceptor.ts`, `apps/api/src/common/decorators/public.decorator.ts`, `apps/api/src/main.ts`, `apps/api/test/auth.e2e-spec.ts`
 
-- [ ] **Tarefa 3 — Recusar acesso inválido sem revelar o motivo na API**
+- [x] **Tarefa 3 — Recusar acesso inválido sem revelar o motivo na API**
   - Cobre: CA2 (lado da API)
   - Teste primeiro: e2e com e-mail inexistente e com senha errada → os dois 401 com a mesma `message` no formato `{ statusCode, error, message, path, timestamp }`; falha porque não há filtro nem recusa
   - Arquivos previstos: `apps/api/src/modules/auth/auth.service.ts`, `apps/api/src/common/filters/http-exception.filter.ts`, `apps/api/src/main.ts`, `apps/api/test/auth.e2e-spec.ts`

@@ -37,4 +37,39 @@ describe('Entrar no sistema (e2e)', () => {
     });
     expect(JSON.stringify(response.body)).not.toContain('passwordHash');
   });
+
+  describe('POST /auth/login com acesso inválido', () => {
+    const recusar = (email: string | undefined, password: string) =>
+      request(app.getHttpServer())
+        .post('/auth/login')
+        .send({ email, password })
+        .expect(401);
+
+    it('recusa e-mail inexistente e senha errada com a mesma mensagem, no formato de erro', async () => {
+      const emailInexistente = await recusar(
+        'ninguem@exemplo.com',
+        'qualquer-senha',
+      );
+      const senhaErrada = await recusar(
+        process.env.SEED_MANAGER_EMAIL,
+        'senha-errada',
+      );
+
+      for (const response of [emailInexistente, senhaErrada]) {
+        expect(Object.keys(response.body).sort()).toEqual([
+          'error',
+          'message',
+          'path',
+          'statusCode',
+          'timestamp',
+        ]);
+        expect(response.body.statusCode).toBe(401);
+        expect(response.body.error).toBe('Unauthorized');
+        expect(response.body.message).toBe('E-mail ou senha inválidos.');
+        expect(response.body.path).toBe('/auth/login');
+        expect(Number.isNaN(Date.parse(response.body.timestamp))).toBe(false);
+      }
+      expect(emailInexistente.body.message).toBe(senhaErrada.body.message);
+    });
+  });
 });
