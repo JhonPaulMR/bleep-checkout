@@ -1,6 +1,6 @@
----
+﻿---
 issue: 10
-status: rascunho   # rascunho | aprovada
+status: aprovada   # rascunho | aprovada
 ---
 
 # US09 — Entrar no sistema
