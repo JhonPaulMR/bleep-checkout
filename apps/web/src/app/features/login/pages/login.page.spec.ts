@@ -1,5 +1,9 @@
 import { provideHttpClient } from '@angular/common/http';
-import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+import {
+  HttpTestingController,
+  provideHttpClientTesting,
+  TestRequest,
+} from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 import { AuthService } from '../../../core/auth/auth.service';
@@ -97,5 +101,47 @@ describe('LoginPage', () => {
     await entrar('OPERATOR');
 
     expect(navigate).toHaveBeenCalledWith('/caixa');
+  });
+
+  async function enviarEResponder(responder: (req: TestRequest) => void) {
+    const fixture = TestBed.createComponent(LoginPage);
+    await fixture.whenStable();
+    const el = fixture.nativeElement as HTMLElement;
+    const email = el.querySelector<HTMLInputElement>('input[type=email]')!;
+    const senha = el.querySelector<HTMLInputElement>('input[type=password]')!;
+    email.value = 'pessoa@bleep.com';
+    email.dispatchEvent(new Event('input'));
+    senha.value = 'senha-errada';
+    senha.dispatchEvent(new Event('input'));
+    el.querySelector<HTMLFormElement>('form')!.dispatchEvent(new Event('submit'));
+    await fixture.whenStable();
+    expect(el.querySelector('button')!.disabled).toBe(true);
+
+    responder(controller.expectOne((r) => r.url.endsWith('/auth/login')));
+    await fixture.whenStable();
+    return { el, email };
+  }
+
+  it('resposta 401 mostra "E-mail ou senha inválidos." e mantém o e-mail', async () => {
+    const { el, email } = await enviarEResponder((req) =>
+      req.flush(
+        { statusCode: 401, message: 'E-mail ou senha inválidos.' },
+        { status: 401, statusText: 'Unauthorized' },
+      ),
+    );
+
+    expect(el.textContent).toContain('E-mail ou senha inválidos.');
+    expect(email.value).toBe('pessoa@bleep.com');
+    expect(el.querySelector('button')!.disabled).toBe(false);
+    expect(navigate).not.toHaveBeenCalled();
+  });
+
+  it('erro de rede mostra "Não foi possível conectar. Tente novamente." e mantém o e-mail', async () => {
+    const { el, email } = await enviarEResponder((req) => req.error(new ProgressEvent('error')));
+
+    expect(el.textContent).toContain('Não foi possível conectar. Tente novamente.');
+    expect(el.textContent).not.toContain('E-mail ou senha inválidos.');
+    expect(email.value).toBe('pessoa@bleep.com');
+    expect(el.querySelector('button')!.disabled).toBe(false);
   });
 });

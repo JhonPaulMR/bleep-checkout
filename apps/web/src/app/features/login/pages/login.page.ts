@@ -1,3 +1,4 @@
+import { HttpErrorResponse } from '@angular/common/http';
 import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
@@ -26,6 +27,7 @@ export class LoginPage {
   protected readonly loading = signal(false);
 
   protected readonly submitted = signal(false);
+  protected readonly failure = signal<string | null>(null);
 
   protected readonly emailError = computed(() => {
     const email = this.email().trim();
@@ -40,6 +42,7 @@ export class LoginPage {
   protected submit(): void {
     this.submitted.set(true);
     if (this.emailError() || this.passwordError()) return;
+    this.failure.set(null);
     this.loading.set(true);
     this.loginService.login(this.email(), this.password()).subscribe({
       next: ({ accessToken, user }) => {
@@ -47,8 +50,14 @@ export class LoginPage {
         this.loading.set(false);
         void this.router.navigateByUrl(AREA_BY_ROLE[user.role]);
       },
-      // TODO #10 (Tarefa 8): mensagens de erro de credencial e de rede.
-      error: () => this.loading.set(false),
+      error: (error: unknown) => {
+        this.loading.set(false);
+        this.failure.set(
+          error instanceof HttpErrorResponse && error.status === 401
+            ? 'E-mail ou senha inválidos.'
+            : 'Não foi possível conectar. Tente novamente.',
+        );
+      },
     });
   }
 }

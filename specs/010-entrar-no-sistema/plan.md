@@ -52,7 +52,7 @@
   - Teste primeiro: teste da página de login (campo vazio ou e-mail inválido mostra a mensagem do campo e nenhuma requisição sai); falha porque o formulário não valida
   - Arquivos previstos: `apps/web/src/app/features/login/pages/*`
 
-- [ ] **Tarefa 8 — Avisar falha na entrada mantendo o e-mail**
+- [x] **Tarefa 8 — Avisar falha na entrada mantendo o e-mail**
   - Cobre: CA2 (lado do front), CA8
   - Teste primeiro: teste da página de login (resposta 401 mostra "E-mail ou senha inválidos."; erro de rede mostra "Não foi possível conectar. Tente novamente."; nos dois casos o e-mail continua preenchido e o botão sai do carregamento); falha porque a página não trata erro
   - Arquivos previstos: `apps/web/src/app/features/login/pages/*`, `apps/web/src/app/features/login/data/login.service.ts`
