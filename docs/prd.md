@@ -168,7 +168,7 @@ Essas relações representam o núcleo do domínio sem definir banco, endpoints 
 
 **Regras relacionadas:** RN08, RN10, RN11, RN18
 
-### US09 — Entrar no sistema · `Must Have` · `M` · Status: `🟡 Ready`
+### US09 — Entrar no sistema · `Must Have` · `M` · Status: `🟢 Live`
 
 **Como** gerente ou operador de caixa, **eu quero** entrar no sistema com o meu acesso **para que** eu use somente as funções do meu papel.
 
@@ -295,3 +295,4 @@ Essas relações representam o núcleo do domínio sem definir banco, endpoints 
 | :--- | :----- | :---------- |
 | 20/09/2026 | 1.0.0 | Definição inicial do tema Bleep Checkout, escopo funcional, regras de negócio e formas de pagamento. |
 | 08/10/2026 | 1.1.0 | Atores gerente e operador de caixa; US01 e US02 passam ao gerente; CPF único em US02; novas US09–US13 (Draft); RN13–RN18; venda PIX pendente não expira; fora de escopo ampliado. |
+| 07/11/2026 | 1.1.1 | US09 (Entrar no sistema) passa a 🟢 Live, implementada na Issue #10. |
