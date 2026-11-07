@@ -185,6 +185,10 @@
 > Inclui as entidades que o escopo mínimo da ficha exige: Produto 1:N Item de
 > venda e Cliente 1:N Venda, e a separação entre pedido (`Sale`) e pagamento
 > (`Payment`) do ID20.
+>
+> **Já no banco:** `User` (com o enum `Role`), criado na Issue #10 pela migration
+> `20261027015348_create_user`. As demais entidades são o desenho previsto e nascem
+> com as histórias que as usam.
 
 ```mermaid
 erDiagram
@@ -202,6 +206,7 @@ erDiagram
     string email UK
     string passwordHash
     Role role
+    datetime createdAt
   }
   Product {
     string id PK
