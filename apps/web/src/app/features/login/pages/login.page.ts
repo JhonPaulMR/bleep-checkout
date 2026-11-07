@@ -2,15 +2,11 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
-import { AuthService, Role } from '../../../core/auth/auth.service';
+import { AuthService } from '../../../core/auth/auth.service';
+import { AREA_BY_ROLE } from '../../../core/auth/role.guard';
 import { LoginService } from '../data/login.service';
 
 const EMAIL_FORMAT = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-const AREA_BY_ROLE: Record<Role, string> = {
-  MANAGER: '/cadastros',
-  OPERATOR: '/caixa',
-};
 
 @Component({
   selector: 'app-login-page',

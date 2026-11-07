@@ -57,7 +57,7 @@
   - Teste primeiro: teste da página de login (resposta 401 mostra "E-mail ou senha inválidos."; erro de rede mostra "Não foi possível conectar. Tente novamente."; nos dois casos o e-mail continua preenchido e o botão sai do carregamento); falha porque a página não trata erro
   - Arquivos previstos: `apps/web/src/app/features/login/pages/*`, `apps/web/src/app/features/login/data/login.service.ts`
 
-- [ ] **Tarefa 9 — Impedir a área do outro papel**
+- [x] **Tarefa 9 — Impedir a área do outro papel**
   - Cobre: CA4, CA5
   - Teste primeiro: teste dos guards `canMatch` (operador em `/cadastros` é desviado para `/caixa`; gerente em `/caixa` é desviado para `/cadastros`; sem sessão, os dois vão para o login); falha porque as rotas não têm guard
   - Arquivos previstos: `apps/web/src/app/core/auth/role.guard.ts`, `apps/web/src/app/app.routes.ts`
