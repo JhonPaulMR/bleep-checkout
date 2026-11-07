@@ -7,6 +7,7 @@ import {
 import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 import { AuthService } from '../../../core/auth/auth.service';
+import { IdleSessionService } from '../../../core/auth/idle-session.service';
 import { LoginPage } from './login.page';
 
 describe('LoginPage', () => {
@@ -143,5 +144,30 @@ describe('LoginPage', () => {
     expect(el.textContent).not.toContain('E-mail ou senha inválidos.');
     expect(email.value).toBe('pessoa@bleep.com');
     expect(el.querySelector('button')!.disabled).toBe(false);
+  });
+
+  it('mostra "Sua sessão expirou. Entre novamente." quando a sessão foi encerrada', async () => {
+    TestBed.inject(IdleSessionService).expire();
+    const fixture = TestBed.createComponent(LoginPage);
+    await fixture.whenStable();
+
+    expect((fixture.nativeElement as HTMLElement).textContent).toContain(
+      'Sua sessão expirou. Entre novamente.',
+    );
+  });
+
+  it('sem sessão encerrada, não mostra o aviso de expiração', async () => {
+    const fixture = TestBed.createComponent(LoginPage);
+    await fixture.whenStable();
+
+    expect((fixture.nativeElement as HTMLElement).textContent).not.toContain('Sua sessão expirou');
+  });
+
+  it('401 do próprio login não mostra o aviso de expiração', async () => {
+    const { el } = await enviarEResponder((req) =>
+      req.flush({}, { status: 401, statusText: 'Unauthorized' }),
+    );
+
+    expect(el.textContent).not.toContain('Sua sessão expirou');
   });
 });

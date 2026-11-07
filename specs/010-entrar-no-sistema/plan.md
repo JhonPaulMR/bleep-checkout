@@ -62,7 +62,7 @@
   - Teste primeiro: teste dos guards `canMatch` (operador em `/cadastros` é desviado para `/caixa`; gerente em `/caixa` é desviado para `/cadastros`; sem sessão, os dois vão para o login); falha porque as rotas não têm guard
   - Arquivos previstos: `apps/web/src/app/core/auth/role.guard.ts`, `apps/web/src/app/app.routes.ts`
 
-- [ ] **Tarefa 10 — Encerrar a sessão depois de 30 minutos sem uso**
+- [x] **Tarefa 10 — Encerrar a sessão depois de 30 minutos sem uso**
   - Cobre: CA6 (lado do front)
   - Teste primeiro: teste com relógio simulado (sem uso por 30 min → sessão limpa e login com "Sua sessão expirou. Entre novamente."; uso antes dos 30 min reinicia o prazo; resposta 401 da API também limpa a sessão e leva ao login com a mesma mensagem); falha porque não há controle de inatividade
   - Arquivos previstos: `apps/web/src/app/core/auth/idle-session.service.ts`, `apps/web/src/app/core/auth/auth.interceptor.ts`, `apps/web/src/app/features/login/pages/*`

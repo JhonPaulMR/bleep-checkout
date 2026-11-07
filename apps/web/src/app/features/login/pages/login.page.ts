@@ -3,6 +3,7 @@ import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { AuthService } from '../../../core/auth/auth.service';
+import { IdleSessionService } from '../../../core/auth/idle-session.service';
 import { AREA_BY_ROLE } from '../../../core/auth/role.guard';
 import { LoginService } from '../data/login.service';
 
@@ -17,6 +18,7 @@ export class LoginPage {
   private readonly loginService = inject(LoginService);
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
+  protected readonly idle = inject(IdleSessionService);
 
   protected readonly email = signal('');
   protected readonly password = signal('');

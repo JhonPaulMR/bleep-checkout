@@ -34,6 +34,10 @@
       }
     </label>
 
+    @if (idle.expired()) {
+      <p class="text-perigo" role="alert">Sua sessão expirou. Entre novamente.</p>
+    }
+
     @if (failure(); as message) {
       <p class="text-perigo" role="alert">{{ message }}</p>
     }
