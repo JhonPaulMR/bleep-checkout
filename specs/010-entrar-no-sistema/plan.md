@@ -42,7 +42,7 @@
   - Teste primeiro: e2e `GET /auth/me` sem token, com token adulterado e com token vencido → 401; com token válido → 200 `{ data: { name, role } }`; falha porque não há guard nem rota
   - Arquivos previstos: `apps/api/src/common/guards/jwt-auth.guard.ts`, `apps/api/src/modules/auth/auth.controller.ts`, `apps/api/src/app.module.ts`, `apps/api/test/auth.e2e-spec.ts`
 
-- [ ] **Tarefa 6 — Levar cada papel à sua área depois de entrar**
+- [x] **Tarefa 6 — Levar cada papel à sua área depois de entrar**
   - Cobre: CA1 (lado do front), CA7
   - Teste primeiro: teste do `AuthService` (guarda token e usuário no `sessionStorage`, nunca no `localStorage`) e da página de login (resposta `MANAGER` navega para `/cadastros`, `OPERATOR` para `/caixa`; o menu mostra só a área do papel); falham porque nada existe
   - Arquivos previstos: `apps/web/src/app/app.config.ts`, `apps/web/src/app/app.routes.ts`, `apps/web/src/app/app.html`, `apps/web/src/app/app.spec.ts`, `apps/web/src/app/core/auth/*`, `apps/web/src/app/core/layout/*`, `apps/web/src/app/features/login/*`, `apps/web/src/app/features/products/pages/*`, `apps/web/src/app/features/checkout/pages/*`, `apps/api/src/main.ts` (CORS)

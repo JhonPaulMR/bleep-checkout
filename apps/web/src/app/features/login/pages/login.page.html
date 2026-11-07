@@ -1,0 +1,38 @@
+<main class="flex min-h-screen items-center justify-center bg-fundo p-md">
+  <form
+    class="flex w-full max-w-sm flex-col gap-md rounded-lg bg-superficie p-lg shadow"
+    (submit)="submit(); $event.preventDefault()"
+  >
+    <h1 class="text-titulo-pagina text-texto">Entrar</h1>
+
+    <label class="flex flex-col gap-xs text-corpo text-texto">
+      E-mail
+      <input
+        type="email"
+        name="email"
+        class="rounded-md border border-desabilitado p-sm text-corpo"
+        [ngModel]="email()"
+        (ngModelChange)="email.set($event)"
+      />
+    </label>
+
+    <label class="flex flex-col gap-xs text-corpo text-texto">
+      Senha
+      <input
+        type="password"
+        name="password"
+        class="rounded-md border border-desabilitado p-sm text-corpo"
+        [ngModel]="password()"
+        (ngModelChange)="password.set($event)"
+      />
+    </label>
+
+    <button
+      type="submit"
+      class="rounded-md bg-primaria p-sm text-corpo-destaque text-superficie hover:brightness-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primaria disabled:bg-desabilitado"
+      [disabled]="loading()"
+    >
+      Entrar
+    </button>
+  </form>
+</main>
