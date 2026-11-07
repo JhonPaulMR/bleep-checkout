@@ -46,6 +46,45 @@ describe('LoginPage', () => {
     );
   });
 
+  async function tentar(emailDigitado: string, senhaDigitada: string) {
+    const fixture = TestBed.createComponent(LoginPage);
+    await fixture.whenStable();
+    const el = fixture.nativeElement as HTMLElement;
+    const email = el.querySelector<HTMLInputElement>('input[type=email]')!;
+    const senha = el.querySelector<HTMLInputElement>('input[type=password]')!;
+    email.value = emailDigitado;
+    email.dispatchEvent(new Event('input'));
+    senha.value = senhaDigitada;
+    senha.dispatchEvent(new Event('input'));
+    el.querySelector<HTMLFormElement>('form')!.dispatchEvent(new Event('submit'));
+    await fixture.whenStable();
+    return el;
+  }
+
+  it('campos em branco mostram as mensagens e nenhuma requisição sai', async () => {
+    const el = await tentar('', '');
+
+    expect(el.textContent).toContain('Informe o e-mail');
+    expect(el.textContent).toContain('Informe a senha');
+    controller.expectNone((r) => r.url.endsWith('/auth/login'));
+  });
+
+  it('e-mail em formato inválido mostra "E-mail inválido" e nenhuma requisição sai', async () => {
+    const el = await tentar('pessoa-sem-arroba', 'segredo123');
+
+    expect(el.textContent).toContain('E-mail inválido');
+    expect(el.textContent).not.toContain('Informe a senha');
+    controller.expectNone((r) => r.url.endsWith('/auth/login'));
+  });
+
+  it('entrada válida não mostra mensagem de campo', async () => {
+    const el = await tentar('pessoa@bleep.com', 'segredo123');
+
+    expect(el.textContent).not.toContain('Informe');
+    expect(el.textContent).not.toContain('E-mail inválido');
+    controller.expectOne((r) => r.url.endsWith('/auth/login'));
+  });
+
   it('gerente é levado à área de Cadastros e a sessão é gravada', async () => {
     await entrar('MANAGER');
 

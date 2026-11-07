@@ -47,7 +47,7 @@
   - Teste primeiro: teste do `AuthService` (guarda token e usuário no `sessionStorage`, nunca no `localStorage`) e da página de login (resposta `MANAGER` navega para `/cadastros`, `OPERATOR` para `/caixa`; o menu mostra só a área do papel); falham porque nada existe
   - Arquivos previstos: `apps/web/src/app/app.config.ts`, `apps/web/src/app/app.routes.ts`, `apps/web/src/app/app.html`, `apps/web/src/app/app.spec.ts`, `apps/web/src/app/core/auth/*`, `apps/web/src/app/core/layout/*`, `apps/web/src/app/features/login/*`, `apps/web/src/app/features/products/pages/*`, `apps/web/src/app/features/checkout/pages/*`, `apps/api/src/main.ts` (CORS)
 
-- [ ] **Tarefa 7 — Validar os campos antes de enviar**
+- [x] **Tarefa 7 — Validar os campos antes de enviar**
   - Cobre: CA3 (lado do front)
   - Teste primeiro: teste da página de login (campo vazio ou e-mail inválido mostra a mensagem do campo e nenhuma requisição sai); falha porque o formulário não valida
   - Arquivos previstos: `apps/web/src/app/features/login/pages/*`
