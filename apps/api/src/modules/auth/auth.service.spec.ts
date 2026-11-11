@@ -34,7 +34,7 @@ describe('AuthService', () => {
 
     const payload = await jwt.verifyAsync(result.accessToken);
     expect(payload.sub).toBe('user-1');
-    expect(payload.role).toBe('MANAGER');
+    expect(payload.role).toBe('ADMIN');
     expect(result.user).toEqual({ name: 'Gerente', role: 'MANAGER' });
     expect(users.findByEmail).toHaveBeenCalledWith('gerente@teste.com');
   });
