@@ -1,0 +1,76 @@
+# Esteira de integração contínua (Atividade 11).
+# A cada Pull Request (e a cada push na main), parte de uma máquina limpa:
+# sobe um PostgreSQL descartável, instala o projeto pelo lockfile, gera o
+# client do Prisma, compila, aplica as migrations e roda testes e lint.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  testes:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        # Mesma versão maior do docker-compose.yml local (postgres:17).
+        image: postgres:17
+        env:
+          POSTGRES_USER: bleep
+          POSTGRES_PASSWORD: bleep
+          POSTGRES_DB: bleep_checkout
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    # Banco e segredos descartáveis, só valem dentro deste job.
+    # Nenhum segredo real entra aqui: produção usa os secrets da plataforma.
+    env:
+      DATABASE_URL: postgresql://bleep:bleep@localhost:5432/bleep_checkout?schema=public
+      DIRECT_URL: postgresql://bleep:bleep@localhost:5432/bleep_checkout?schema=public
+      JWT_SECRET: segredo-descartavel-somente-para-o-ci
+      WEB_ORIGIN: http://localhost:4200
+      SEED_MANAGER_EMAIL: gerente@teste.local
+      SEED_MANAGER_PASSWORD: Gerente@123
+      SEED_OPERATOR_EMAIL: operador@teste.local
+      SEED_OPERATOR_PASSWORD: Operador@123
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Instalar o projeto inteiro
+        run: npm ci
+
+      - name: Gerar o client do Prisma
+        working-directory: apps/api
+        run: npx prisma generate
+
+      - name: Compilar a API (confere os tipos)
+        run: npm run build -w apps/api
+
+      - name: Compilar o frontend (acusa import quebrado)
+        run: npm run build -w apps/web
+
+      - name: Aplicar as migrations
+        working-directory: apps/api
+        run: npx prisma migrate deploy
+
+      - name: Testes
+        run: npm run test -w apps/api
+
+      - name: Testes de ponta a ponta
+        run: npm run test:e2e -w apps/api
+
+      - name: Lint
+        run: npm run lint -w apps/api
