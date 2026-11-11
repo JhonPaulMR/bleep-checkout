@@ -7,6 +7,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
+import { Prisma } from '../../../generated/prisma/client.js';
 
 @Catch()
 export class HttpExceptionFilter implements ExceptionFilter {
@@ -32,8 +33,21 @@ export class HttpExceptionFilter implements ExceptionFilter {
         message = parsed.message ?? exception.message;
         error = parsed.error ?? exception.name;
       }
+    } else if (exception instanceof Prisma.PrismaClientKnownRequestError) {
+      const mapeado = this.mapearErroPrisma(exception);
+      if (mapeado) {
+        statusCode = mapeado.statusCode;
+        error = mapeado.error;
+        message = mapeado.message;
+        this.logger.warn(
+          `${request.method} ${request.url} - Prisma ${exception.code}: ${exception.message}`,
+        );
+      } else {
+        this.logger.error(`${request.method} ${request.url}`, exception.stack);
+      }
     } else {
       this.logger.error(
+        `${request.method} ${request.url}`,
         exception instanceof Error ? exception.stack : String(exception),
       );
     }
@@ -45,5 +59,33 @@ export class HttpExceptionFilter implements ExceptionFilter {
       path: request.url,
       timestamp: new Date().toISOString(),
     });
+  }
+
+  private mapearErroPrisma(
+    exception: Prisma.PrismaClientKnownRequestError,
+  ): { statusCode: number; error: string; message: string } | null {
+    if (exception.code === 'P2002') {
+      const target = exception.meta?.target;
+      const campos = Array.isArray(target)
+        ? target.map(String).join(', ')
+        : typeof target === 'string'
+          ? target
+          : '';
+      return {
+        statusCode: HttpStatus.CONFLICT,
+        error: 'Conflict',
+        message: campos
+          ? `Já existe um registro com este valor de ${campos}.`
+          : 'Já existe um registro com estes dados.',
+      };
+    }
+    if (exception.code === 'P2025') {
+      return {
+        statusCode: HttpStatus.NOT_FOUND,
+        error: 'Not Found',
+        message: 'Registro não encontrado.',
+      };
+    }
+    return null;
   }
 }
