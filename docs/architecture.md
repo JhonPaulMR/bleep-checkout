@@ -74,7 +74,7 @@
 | **ID6 · Camadas** | `Controller` só recebe e responde (HTTP) → `Service` tem a regra de negócio → `PrismaService` acessa o banco. Controller nunca acessa o Prisma; Service nunca conhece `Request`/`Response`. Um `Module` por domínio. |
 | **ID7 · Entrada** | Toda entrada é um DTO com `class-validator`. `ValidationPipe` global com `whitelist: true`, `forbidNonWhitelisted: true` e `transform: true`. |
 | **ID8 · Dados** | Acesso ao banco **só** via `PrismaService`. Operação que altera saldo, venda e pagamento juntos roda em `prisma.$transaction`. O débito de crédito é um update condicional (saldo ≥ total) para não deixar saldo negativo nem sob concorrência. Dinheiro em **centavos inteiros** (`Int`). |
-| **ID9 · Autenticação** | `@nestjs/jwt`. `JwtAuthGuard` **global**, liberado com `@Public()` só no login e no webhook. `RolesGuard` com `@Roles('MANAGER' \| 'OPERATOR')`. Senha com `argon2`; o hash nunca sai na resposta. |
+| **ID9 · Autenticação** | `@nestjs/jwt`. `JwtAuthGuard` **global**, liberado com `@Public()` só no login e no webhook. `RolesGuard` **global** (registrado depois de `JwtAuthGuard`) com `@Roles('MANAGER' \| 'OPERATOR')` e comparação estrita (`required.some(r => r === user.role)`): `MANAGER` não opera o caixa e `OPERATOR` não acessa cadastros (RN13). Token JWT com validade de **12 horas** (somado ao timeout de 30 minutos por inatividade no front). Senha com `argon2`; o hash nunca sai na resposta. |
 | **ID10 · Resposta e erro** | `ResponseInterceptor` global: sucesso sai como `{ data }`. `HttpExceptionFilter` global: erro sai como `{ statusCode, error, message, path, timestamp }`. Erros de domínio têm classe própria e viram **409** (conflito, ex.: código ou CPF duplicado) ou **422** (regra violada, ex.: saldo insuficiente). |
 | **ID17 · Segredos** | `ConfigModule` com validação das variáveis no boot (a API não sobe sem elas): `DATABASE_URL`, `DIRECT_URL`, `JWT_SECRET`, `MP_ACCESS_TOKEN`, `MP_WEBHOOK_SECRET`, `WEB_ORIGIN`. Só o `.env.example` vai para o repositório; o `.env` fica no `.gitignore`; os valores de produção ficam nas variáveis do Render e da Vercel. |
 | **ID18 · CI** | GitHub Actions em todo PR para a `main`: lint + teste dos dois apps + e2e da API com Postgres como *service* do job, além do check `explicacao`. |
@@ -143,7 +143,7 @@
 
 - **Camada de dados:** cada feature tem `data/<feature>.service.ts` com `HttpClient`, o **único** lugar que conhece URL e formato da API. Ele desembrulha o `{ data }` do `ResponseInterceptor`. Componentes de página consomem o service; componentes de `components/` e de `shared/ui/` só recebem `input()` e emitem `output()`.
 - **Dependências entre pastas:** `features/*` pode importar de `core/` e `shared/`. `shared/` não importa de `features/`. Uma feature não importa de outra; o que for comum sobe para `shared/` ou `core/`.
-- **Autenticação no front (ID16):** o token JWT fica no `sessionStorage`. Um interceptor HTTP anexa `Authorization: Bearer`, e uma resposta 401 limpa a sessão e leva ao Login. Guards de rota (`canMatch`) separam as rotas do Operador (caixa e pendentes) das do Gerente (produtos, clientes e operadores). O menu do cabeçalho segue o papel.
+- **Autenticação no front (ID16):** o token JWT fica no `sessionStorage` (escolha consciente para esta etapa: encerra a sessão ao fechar a aba em caixa compartilhado e simplifica o consumo da API; a alternativa mais segura contra XSS seria cookie `httpOnly`, descartada pelo custo adicional de infraestrutura nesta fase). Um interceptor HTTP anexa `Authorization: Bearer`, e uma resposta 401 limpa a sessão e leva ao Login. Guards de rota (`canMatch`) separam as rotas do Operador (caixa e pendentes) das do Gerente (produtos, clientes e operadores). O menu do cabeçalho segue o papel.
 - **Estado:** signals por feature (ex.: a venda em montagem). A confirmação do PIX é acompanhada por polling do status da venda no service da feature `checkout`, até ela sair de `PENDING`.
 
 ---
@@ -157,7 +157,7 @@
 
 | Termo PRD (PT-BR) | Entidade técnica (EN) | Atributos principais |
 | :---------------- | :-------------------- | :------------------- |
-| Gerente / Operador de caixa (Acesso) | `User` | `id`, `name`, `email` (único), `passwordHash`, `role` (`MANAGER` \| `OPERATOR`), `createdAt` |
+| Gerente / Operador de caixa (Acesso) | `User` | `id`, `name`, `email` (único), `passwordHash`, `role` (`MANAGER` \| `OPERATOR`), `createdById?` (FK `User`), `createdAt` |
 | Produto (Produto desativado) | `Product` | `id`, `name`, `barcode` (único, EAN-13), `priceCents`, `active`, `createdAt` |
 | Cliente | `Customer` | `id`, `name`, `cpf` (único), `balanceCents` (≥ 0), `createdAt` |
 | Crédito do cliente (movimentação) | `CreditTransaction` | `id`, `customerId`, `saleId?`, `type` (`INITIAL` \| `TOP_UP` \| `SALE_DEBIT`), `amountCents`, `createdAt` |
@@ -186,12 +186,11 @@
 > venda e Cliente 1:N Venda, e a separação entre pedido (`Sale`) e pagamento
 > (`Payment`) do ID20.
 >
-> **Já no banco:** `User` (com o enum `Role`), criado na Issue #10 pela migration
-> `20261027015348_create_user`. As demais entidades são o desenho previsto e nascem
-> com as histórias que as usam.
+> **Já no banco:** `User` (com o enum `Role` e a autorrelação `1:N` `createdById` → `User`), criado na Issue #10 (`20261027015348_create_user`) e evoluído na Issue #11 (`20261121130721_add_user_created_by`). As demais entidades são o desenho previsto e nascem com as histórias que as usam.
 
 ```mermaid
 erDiagram
+  User |o--o{ User : "cadastra"
   User ||--o{ Sale : "opera"
   Customer |o--o{ Sale : "identifica"
   Customer ||--o{ CreditTransaction : "movimenta"
@@ -206,6 +205,7 @@ erDiagram
     string email UK
     string passwordHash
     Role role
+    string createdById FK
     datetime createdAt
   }
   Product {
@@ -281,7 +281,8 @@ erDiagram
 
 | Domínio | Módulo (pasta) | Guard | Dados (repository) | US |
 | :------ | :------------- | :---- | :----------------- | :-- |
-| | | | | |
+| Autenticação | `apps/api/src/modules/auth` | `JwtAuthGuard` global (`@Public()` em `/auth/login`) | `UsersService` / `PrismaService` | US09 (#10) |
+| Usuários / Operadores | `apps/api/src/modules/users` | `JwtAuthGuard` + `RolesGuard` (`@Roles(Role.MANAGER)` em `POST/GET /users`; regra de dono em `GET /users/:id`) | `UsersService` / `PrismaService` | US10 (#11) |
 
 ---
 
@@ -292,6 +293,7 @@ erDiagram
 | 08/10/2026 | 1.0.0 | Versão inicial via `/utf-architecture`: Angular 22+, NestJS 12+ + Prisma 7+ + PostgreSQL 17+, Neon, Render, Vercel, Mercado Pago sandbox |
 | 09/10/2026 | 1.0.1 | `/utf-setup`: lint da API ratificado como **oxlint**, o padrão do gerador do NestJS 12+; o web segue com ESLint (`angular-eslint`) |
 | 25/10/2026 | 1.0.2 | Fechamento da Atividade 08: adoção de **npm workspaces** (revoga o "sem workspaces" da 1.0.0, exigido pelo `npm install` único e pelo `npm ci` do CI), ESM ratificado, Prisma 7 + `@nestjs/config` instalados sem nenhum `model`, `.env.example` com `DATABASE_URL` e `DIRECT_URL` |
+| 21/11/2026 | 1.0.3 | Fechamento da US10 (#11 / Atividade 13): `RolesGuard` global estrito, validade do token (12h + 30 min inatividade), justificativa do `sessionStorage`, relação `1:N` `User.createdById` no ER e Mapa de Domínios atualizado |
 
 ---
 

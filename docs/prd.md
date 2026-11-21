@@ -181,7 +181,7 @@ Essas relações representam o núcleo do domínio sem definir banco, endpoints 
 
 **Regras relacionadas:** RN13
 
-### US10 — Cadastrar operador · `Must Have` · `S` · Status: `🟡 Ready`
+### US10 — Cadastrar operador · `Must Have` · `S` · Status: `🟢 Live`
 
 **Como** gerente, **eu quero** cadastrar operadores de caixa **para que** cada operador entre no sistema com o próprio acesso.
 
