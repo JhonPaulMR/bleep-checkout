@@ -1,9 +1,12 @@
+import { HttpErrorResponse } from '@angular/common/http';
 import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Operator, OperatorsService } from '../data/operators.service';
 
 const EMAIL_FORMAT = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MIN_PASSWORD_LENGTH = 8;
+const DUPLICATE_EMAIL_MESSAGE = 'Já existe um usuário com este e-mail.';
+const NETWORK_ERROR_MESSAGE = 'Não foi possível conectar. Tente novamente.';
 
 @Component({
   selector: 'app-operators-page',
@@ -15,7 +18,9 @@ export class OperatorsPage implements OnInit {
 
   protected readonly operators = signal<Operator[]>([]);
   protected readonly loadingList = signal(true);
+  protected readonly listError = signal<string | null>(null);
   protected readonly submitting = signal(false);
+  protected readonly submitError = signal<string | null>(null);
 
   protected readonly name = signal('');
   protected readonly email = signal('');
@@ -44,15 +49,23 @@ export class OperatorsPage implements OnInit {
     this.operatorsService.list().subscribe({
       next: (operators) => {
         this.operators.set(operators);
+        this.listError.set(null);
         this.loadingList.set(false);
+      },
+      error: (err: unknown) => {
+        this.loadingList.set(false);
+        if (err instanceof HttpErrorResponse && err.status === 401) return;
+        this.listError.set(NETWORK_ERROR_MESSAGE);
       },
     });
   }
 
   protected submit(): void {
+    if (this.submitting()) return;
     this.submitted.set(true);
     if (this.nameError() || this.emailError() || this.passwordError()) return;
 
+    this.submitError.set(null);
     this.submitting.set(true);
     this.operatorsService
       .create({
@@ -68,6 +81,20 @@ export class OperatorsPage implements OnInit {
           this.password.set('');
           this.submitted.set(false);
           this.submitting.set(false);
+        },
+        error: (err: unknown) => {
+          this.submitting.set(false);
+          if (err instanceof HttpErrorResponse) {
+            if (err.status === 401) return;
+            if (err.status === 409) {
+              const apiMessage = (err.error as { message?: unknown } | null)?.message;
+              this.submitError.set(
+                typeof apiMessage === 'string' ? apiMessage : DUPLICATE_EMAIL_MESSAGE,
+              );
+              return;
+            }
+          }
+          this.submitError.set(NETWORK_ERROR_MESSAGE);
         },
       });
   }

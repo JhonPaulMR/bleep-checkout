@@ -45,7 +45,7 @@
   - Teste primeiro: unit da `OperatorsPage` (lista vazia exibe mensagem de estado vazio; campos vazios/inválidos bloqueiam envio e mostram erro por campo; envio válido chama `OperatorsService.create`, atualiza a lista e limpa o formulário); falha porque a página não existe
   - Arquivos previstos: `apps/web/src/app/features/operators/pages/operators.page.ts`, `apps/web/src/app/features/operators/pages/operators.page.html`, `apps/web/src/app/features/operators/pages/operators.page.spec.ts`
 
-- [ ] **Tarefa 7 — Tratar conflito 409, sessão expirada 401 e falha de rede na tela de operadores**
+- [x] **Tarefa 7 — Tratar conflito 409, sessão expirada 401 e falha de rede na tela de operadores**
   - Cobre: CA2 (lado do front), CA8, CA9
   - Teste primeiro: unit da `OperatorsPage` (`409` exibe "Já existe um usuário com este e-mail." mantendo campos preenchidos; erro de rede exibe "Não foi possível conectar. Tente novamente." mantendo campos e saindo do carregamento; `401` dispara o tratamento do `authInterceptor` levando ao login com mensagem de sessão expirada); falha porque a página não trata esses erros
   - Arquivos previstos: `apps/web/src/app/features/operators/pages/operators.page.ts`, `apps/web/src/app/features/operators/pages/operators.page.html`, `apps/web/src/app/features/operators/pages/operators.page.spec.ts`
