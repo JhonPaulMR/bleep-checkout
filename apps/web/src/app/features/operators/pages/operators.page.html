@@ -1,0 +1,93 @@
+<main class="min-h-screen bg-fundo p-lg">
+  <div class="mx-auto flex max-w-4xl flex-col gap-lg">
+    <h1 class="text-titulo-pagina text-texto">Operadores</h1>
+
+    <section class="rounded-lg bg-superficie p-lg shadow">
+      <h2 class="mb-md text-titulo-secao text-texto">Cadastrar operador</h2>
+
+      <form
+        novalidate
+        class="flex flex-col gap-md"
+        (submit)="submit(); $event.preventDefault()"
+      >
+        <div class="flex flex-col gap-xs">
+          <label for="operator-name" class="text-corpo text-texto">Nome</label>
+          <input
+            id="operator-name"
+            type="text"
+            name="name"
+            class="rounded-md border border-desabilitado p-sm text-corpo text-texto focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primaria"
+            [ngModel]="name()"
+            (ngModelChange)="name.set($event)"
+          />
+          @if (submitted() && nameError(); as message) {
+            <span class="text-legenda text-perigo" role="alert">{{ message }}</span>
+          }
+        </div>
+
+        <div class="flex flex-col gap-xs">
+          <label for="operator-email" class="text-corpo text-texto">E-mail</label>
+          <input
+            id="operator-email"
+            type="email"
+            name="email"
+            class="rounded-md border border-desabilitado p-sm text-corpo text-texto focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primaria"
+            [ngModel]="email()"
+            (ngModelChange)="email.set($event)"
+          />
+          @if (submitted() && emailError(); as message) {
+            <span class="text-legenda text-perigo" role="alert">{{ message }}</span>
+          }
+        </div>
+
+        <div class="flex flex-col gap-xs">
+          <label for="operator-password" class="text-corpo text-texto">Senha</label>
+          <input
+            id="operator-password"
+            type="password"
+            name="password"
+            class="rounded-md border border-desabilitado p-sm text-corpo text-texto focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primaria"
+            [ngModel]="password()"
+            (ngModelChange)="password.set($event)"
+          />
+          @if (submitted() && passwordError(); as message) {
+            <span class="text-legenda text-perigo" role="alert">{{ message }}</span>
+          }
+        </div>
+
+        <div>
+          <button
+            type="submit"
+            class="rounded-md bg-primaria px-md py-sm text-corpo-destaque text-superficie hover:brightness-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primaria disabled:bg-desabilitado"
+            [disabled]="submitting()"
+          >
+            @if (submitting()) {
+              Cadastrando...
+            } @else {
+              Cadastrar operador
+            }
+          </button>
+        </div>
+      </form>
+    </section>
+
+    <section class="rounded-lg bg-superficie p-lg shadow">
+      <h2 class="mb-md text-titulo-secao text-texto">Operadores cadastrados</h2>
+
+      @if (loadingList()) {
+        <p class="text-corpo text-texto-suave">Carregando operadores...</p>
+      } @else if (operators().length === 0) {
+        <p class="text-corpo text-texto-suave">Nenhum operador cadastrado ainda.</p>
+      } @else {
+        <ul class="divide-y divide-desabilitado">
+          @for (operator of operators(); track operator.id) {
+            <li class="flex flex-col gap-xs py-sm">
+              <span class="text-corpo-destaque text-texto">{{ operator.name }}</span>
+              <span class="text-legenda text-texto-suave">{{ operator.email }}</span>
+            </li>
+          }
+        </ul>
+      }
+    </section>
+  </div>
+</main>

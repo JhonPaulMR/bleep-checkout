@@ -40,7 +40,7 @@
   - Teste primeiro: unit do `OperatorsService` (`list()` e `create()` acessam `/users` e desembrulham `{ data }`), teste do `Header` (gerente vê `Cadastros` e `Operadores`; operador vê só `Caixa`) e teste do `roleGuard` na rota `/operadores` (`OPERATOR` redirecionado para `/caixa`); falham porque serviço, rota e link não existem
   - Arquivos previstos: `apps/web/src/app/features/operators/data/operators.service.ts`, `apps/web/src/app/features/operators/data/operators.service.spec.ts`, `apps/web/src/app/core/layout/header.ts`, `apps/web/src/app/core/layout/header.spec.ts`, `apps/web/src/app/app.routes.ts`
 
-- [ ] **Tarefa 6 — Construir tela de listagem e cadastro de operadores com validação no frontend**
+- [x] **Tarefa 6 — Construir tela de listagem e cadastro de operadores com validação no frontend**
   - Cobre: CA1 (lado do front), CA3 (lado do front), CA7 (lado do front)
   - Teste primeiro: unit da `OperatorsPage` (lista vazia exibe mensagem de estado vazio; campos vazios/inválidos bloqueiam envio e mostram erro por campo; envio válido chama `OperatorsService.create`, atualiza a lista e limpa o formulário); falha porque a página não existe
   - Arquivos previstos: `apps/web/src/app/features/operators/pages/operators.page.ts`, `apps/web/src/app/features/operators/pages/operators.page.html`, `apps/web/src/app/features/operators/pages/operators.page.spec.ts`
