@@ -15,7 +15,7 @@
 
 ## Tarefas
 
-- [ ] **Tarefa 1 — Adicionar relação 1:N `createdById` no `User` com migration**
+- [x] **Tarefa 1 — Adicionar relação 1:N `createdById` no `User` com migration**
   - Cobre: pré-requisito de CA6 (passo técnico)
   - Teste primeiro: teste e2e ou unitário verificando que um operador criado com `createdById` aponta para o gerente criador na relação `createdBy` / `createdUsers`; falha porque `createdById` ainda não existe no `schema.prisma`
   - Arquivos previstos: `apps/api/prisma/schema.prisma`, `apps/api/prisma/migrations/<timestamp>_add_user_created_by/migration.sql`, `apps/api/prisma/seed.ts`
