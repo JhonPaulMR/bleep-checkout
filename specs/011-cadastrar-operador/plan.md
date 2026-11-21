@@ -20,7 +20,7 @@
   - Teste primeiro: teste e2e ou unitário verificando que um operador criado com `createdById` aponta para o gerente criador na relação `createdBy` / `createdUsers`; falha porque `createdById` ainda não existe no `schema.prisma`
   - Arquivos previstos: `apps/api/prisma/schema.prisma`, `apps/api/prisma/migrations/<timestamp>_add_user_created_by/migration.sql`, `apps/api/prisma/seed.ts`
 
-- [ ] **Tarefa 2 — Implementar `RolesGuard` global e decorator `@Roles`**
+- [x] **Tarefa 2 — Implementar `RolesGuard` global e decorator `@Roles`**
   - Cobre: CA4 (lado da API — mecanismo de autorização por papel)
   - Teste primeiro: unit do `RolesGuard` (rota sem `@Roles` retorna `true`; rota com `@Roles(Role.MANAGER)` permite `MANAGER` e retorna `false` para `OPERATOR`); falha porque `RolesGuard` e `@Roles` não existem
   - Arquivos previstos: `apps/api/src/common/decorators/roles.decorator.ts`, `apps/api/src/common/guards/roles.guard.ts`, `apps/api/src/common/guards/roles.guard.spec.ts`, `apps/api/src/app.module.ts`
