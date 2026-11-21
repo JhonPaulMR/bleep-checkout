@@ -40,6 +40,24 @@ describe('Seed de acessos (e2e)', () => {
     },
   );
 
+  it('vincula o operador do seed ao gerente criador via createdById / createdBy / createdUsers', async () => {
+    const manager = await prisma.user.findUnique({
+      where: { email: process.env.SEED_MANAGER_EMAIL! },
+      include: { createdUsers: true },
+    });
+    const operator = await prisma.user.findUnique({
+      where: { email: process.env.SEED_OPERATOR_EMAIL! },
+      include: { createdBy: true },
+    });
+
+    expect(manager).not.toBeNull();
+    expect(operator).not.toBeNull();
+    expect(manager!.createdById).toBeNull();
+    expect(operator!.createdById).toBe(manager!.id);
+    expect(operator!.createdBy?.id).toBe(manager!.id);
+    expect(manager!.createdUsers.map((u) => u.id)).toContain(operator!.id);
+  });
+
   it('rodar o seed de novo não duplica os acessos', async () => {
     execSync('npx prisma db seed', { stdio: 'pipe' });
 

@@ -13,17 +13,29 @@ function requireEnv(name: string): string {
 
 async function upsertUser(
   prisma: PrismaClient,
-  data: { name: string; email: string; password: string; role: Role },
+  data: {
+    name: string;
+    email: string;
+    password: string;
+    role: Role;
+    createdById?: string | null;
+  },
 ) {
   const passwordHash = await argon2.hash(data.password);
-  await prisma.user.upsert({
+  return prisma.user.upsert({
     where: { email: data.email },
-    update: { name: data.name, passwordHash, role: data.role },
+    update: {
+      name: data.name,
+      passwordHash,
+      role: data.role,
+      createdById: data.createdById ?? null,
+    },
     create: {
       name: data.name,
       email: data.email,
       passwordHash,
       role: data.role,
+      createdById: data.createdById ?? null,
     },
   });
 }
@@ -39,18 +51,19 @@ async function main() {
   });
 
   try {
-    await upsertUser(prisma, {
+    const manager = await upsertUser(prisma, {
       name: 'Gerente',
       email: managerEmail,
       password: managerPassword,
       role: Role.MANAGER,
+      createdById: null,
     });
-    // TODO #11: o operador inicial some quando existir a tela de cadastro de operadores.
     await upsertUser(prisma, {
       name: 'Operador',
       email: operatorEmail,
       password: operatorPassword,
       role: Role.OPERATOR,
+      createdById: manager.id,
     });
   } finally {
     await prisma.$disconnect();
