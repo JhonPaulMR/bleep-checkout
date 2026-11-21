@@ -25,7 +25,7 @@
   - Teste primeiro: unit do `RolesGuard` (rota sem `@Roles` retorna `true`; rota com `@Roles(Role.MANAGER)` permite `MANAGER` e retorna `false` para `OPERATOR`); falha porque `RolesGuard` e `@Roles` não existem
   - Arquivos previstos: `apps/api/src/common/decorators/roles.decorator.ts`, `apps/api/src/common/guards/roles.guard.ts`, `apps/api/src/common/guards/roles.guard.spec.ts`, `apps/api/src/app.module.ts`
 
-- [ ] **Tarefa 3 — Cadastrar operador na API com hash `argon2`, papel fixo e `409` para duplicidade**
+- [x] **Tarefa 3 — Cadastrar operador na API com hash `argon2`, papel fixo e `409` para duplicidade**
   - Cobre: CA1 (lado da API), CA2 (lado da API), CA3 (lado da API), CA4 (`POST /users` → 403), CA5 (`POST /users` → 401)
   - Teste primeiro: unit do `UsersService.createOperator` (hash `argon2`, `role: OPERATOR` fixo, `createdById`, sem `passwordHash`, `409` em e-mail duplicado) e e2e `POST /users` (`201` + login imediato do operador criado, `409` duplicado, `400` entrada inválida ou campo `role` extra, `403` com token de operador, `401` sem token/token adulterado); falham porque DTO, controller e método não existem
   - Arquivos previstos: `apps/api/src/modules/users/dto/create-operator.dto.ts`, `apps/api/src/modules/users/users.controller.ts`, `apps/api/src/modules/users/users.service.ts`, `apps/api/src/modules/users/users.service.spec.ts`, `apps/api/src/modules/users/users.module.ts`, `apps/api/test/users.e2e-spec.ts`
