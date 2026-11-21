@@ -30,7 +30,7 @@
   - Teste primeiro: unit do `UsersService.createOperator` (hash `argon2`, `role: OPERATOR` fixo, `createdById`, sem `passwordHash`, `409` em e-mail duplicado) e e2e `POST /users` (`201` + login imediato do operador criado, `409` duplicado, `400` entrada inválida ou campo `role` extra, `403` com token de operador, `401` sem token/token adulterado); falham porque DTO, controller e método não existem
   - Arquivos previstos: `apps/api/src/modules/users/dto/create-operator.dto.ts`, `apps/api/src/modules/users/users.controller.ts`, `apps/api/src/modules/users/users.service.ts`, `apps/api/src/modules/users/users.service.spec.ts`, `apps/api/src/modules/users/users.module.ts`, `apps/api/test/users.e2e-spec.ts`
 
-- [ ] **Tarefa 4 — Listar operadores e consultar usuário por id com regra de dono na API**
+- [x] **Tarefa 4 — Listar operadores e consultar usuário por id com regra de dono na API**
   - Cobre: CA4 (`GET /users` → 403), CA5 (`GET /users` e `GET /users/:id` → 401), CA6 (regra de dono em `GET /users/:id`), CA7 (lado da API — lista vazia)
   - Teste primeiro: unit do `UsersService` (`listOperators` retorna apenas `OPERATOR` sem `passwordHash`; `findByIdForRequester` permite dono/próprio usuário e lança `ForbiddenException` para outro usuário) e e2e `GET /users` e `GET /users/:id` (`200` lista/vazia para gerente, `403` para operador em `GET /users`, `200` para próprio usuário e gerente criador em `GET /users/:id`, `403` para outro usuário autenticado em `GET /users/:id`, `401` sem token); falham porque os endpoints não existem
   - Arquivos previstos: `apps/api/src/modules/users/users.controller.ts`, `apps/api/src/modules/users/users.service.ts`, `apps/api/src/modules/users/users.service.spec.ts`, `apps/api/test/users.e2e-spec.ts`

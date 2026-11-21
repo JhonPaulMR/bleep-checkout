@@ -1,4 +1,4 @@
-import { Body, Controller, Post, Req } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Req } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiOperation,
@@ -39,5 +39,43 @@ export class UsersController {
     @Req() request: { user: JwtPayload },
   ) {
     return this.users.createOperator(body, request.user.sub);
+  }
+
+  @Get()
+  @Roles(Role.MANAGER)
+  @ApiOperation({ summary: 'Lista os operadores de caixa cadastrados' })
+  @ApiResponse({ status: 200, description: 'Lista de operadores cadastrados' })
+  @ApiResponse({
+    status: 401,
+    description: 'Sessão ausente, inválida ou expirada',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Acesso permitido apenas para gerentes',
+  })
+  listOperators() {
+    return this.users.listOperators();
+  }
+
+  @Get(':id')
+  @ApiOperation({ summary: 'Consulta um usuário por id' })
+  @ApiResponse({ status: 200, description: 'Usuário encontrado' })
+  @ApiResponse({
+    status: 401,
+    description: 'Sessão ausente, inválida ou expirada',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Você não tem permissão para consultar este usuário.',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Usuário não encontrado.',
+  })
+  findOne(
+    @Param('id') id: string,
+    @Req() request: { user: JwtPayload },
+  ) {
+    return this.users.findByIdForRequester(id, request.user.sub);
   }
 }

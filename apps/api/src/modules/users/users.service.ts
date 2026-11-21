@@ -1,4 +1,9 @@
-import { ConflictException, Injectable } from '@nestjs/common';
+import {
+  ConflictException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import * as argon2 from 'argon2';
 import { Role } from '../../../generated/prisma/enums.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
@@ -46,5 +51,32 @@ export class UsersService {
       },
       select: PUBLIC_USER_SELECT,
     });
+  }
+
+  listOperators() {
+    return this.prisma.user.findMany({
+      where: { role: Role.OPERATOR },
+      orderBy: { createdAt: 'desc' },
+      select: PUBLIC_USER_SELECT,
+    });
+  }
+
+  async findByIdForRequester(id: string, requesterId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id },
+      select: PUBLIC_USER_SELECT,
+    });
+
+    if (!user) {
+      throw new NotFoundException('Usuário não encontrado.');
+    }
+
+    if (user.id !== requesterId && user.createdById !== requesterId) {
+      throw new ForbiddenException(
+        'Você não tem permissão para consultar este usuário.',
+      );
+    }
+
+    return user;
   }
 }
