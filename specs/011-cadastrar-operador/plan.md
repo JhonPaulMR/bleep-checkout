@@ -35,7 +35,7 @@
   - Teste primeiro: unit do `UsersService` (`listOperators` retorna apenas `OPERATOR` sem `passwordHash`; `findByIdForRequester` permite dono/próprio usuário e lança `ForbiddenException` para outro usuário) e e2e `GET /users` e `GET /users/:id` (`200` lista/vazia para gerente, `403` para operador em `GET /users`, `200` para próprio usuário e gerente criador em `GET /users/:id`, `403` para outro usuário autenticado em `GET /users/:id`, `401` sem token); falham porque os endpoints não existem
   - Arquivos previstos: `apps/api/src/modules/users/users.controller.ts`, `apps/api/src/modules/users/users.service.ts`, `apps/api/src/modules/users/users.service.spec.ts`, `apps/api/test/users.e2e-spec.ts`
 
-- [ ] **Tarefa 5 — Criar serviço de operadores, rota `/operadores` e menu do gerente no frontend**
+- [x] **Tarefa 5 — Criar serviço de operadores, rota `/operadores` e menu do gerente no frontend**
   - Cobre: CA4 (lado do front — menu e guard de rota), CA1/CA7 (camada de serviço)
   - Teste primeiro: unit do `OperatorsService` (`list()` e `create()` acessam `/users` e desembrulham `{ data }`), teste do `Header` (gerente vê `Cadastros` e `Operadores`; operador vê só `Caixa`) e teste do `roleGuard` na rota `/operadores` (`OPERATOR` redirecionado para `/caixa`); falham porque serviço, rota e link não existem
   - Arquivos previstos: `apps/web/src/app/features/operators/data/operators.service.ts`, `apps/web/src/app/features/operators/data/operators.service.spec.ts`, `apps/web/src/app/core/layout/header.ts`, `apps/web/src/app/core/layout/header.spec.ts`, `apps/web/src/app/app.routes.ts`
