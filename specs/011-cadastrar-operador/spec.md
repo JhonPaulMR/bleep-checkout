@@ -1,6 +1,6 @@
 ---
 issue: 11
-status: rascunho   # rascunho | aprovada
+status: aprovada
 ---
 
 # US10 — Cadastrar operador
