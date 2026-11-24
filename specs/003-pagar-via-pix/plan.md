@@ -43,7 +43,7 @@
   - Teste primeiro: unit de `SalesService` (cálculo de `totalCents` a partir de `Product.priceCents`, recusa de lista vazia/quantidade inválida/produto inativo e regra de dono) e e2e (`POST /sales` `201`, `400` ao tentar enviar `totalCents`/`priceCents`/`transaction_amount`, `401` sem token, `403` para `MANAGER` ou `OPERATOR` diferente do dono); falham porque os módulos `products` e `sales` não existem
   - Arquivos previstos: `apps/api/src/modules/products/products.module.ts`, `apps/api/src/modules/products/products.controller.ts`, `apps/api/src/modules/products/products.service.ts`, `apps/api/src/modules/sales/sales.module.ts`, `apps/api/src/modules/sales/sales.controller.ts`, `apps/api/src/modules/sales/sales.service.ts`, `apps/api/src/modules/sales/sales.service.spec.ts`, `apps/api/src/modules/sales/dto/create-sale.dto.ts`, `apps/api/src/app.module.ts`, `apps/api/test/sales.e2e-spec.ts`
 
-- [ ] **Tarefa 4 — Criar interface `PaymentGateway` (Mercado Pago), máquina de estados e `GET /payments/config`**
+- [x] **Tarefa 4 — Criar interface `PaymentGateway` (Mercado Pago), máquina de estados e `GET /payments/config`**
   - Cobre: CA2 (lado da API), pré-requisito de CA3–CA6 e CA10
   - Complexidade sugerida (orquestração): Média (`inherit`)
   - Teste primeiro: unit da máquina de estados (`canTransitionSale` e `canTransitionPayment`, bloqueando regressões como `COMPLETED` → `PENDING`/`OPEN`/`CANCELED`) e e2e de `GET /payments/config` (`200` com apenas `publicKey`, nunca expondo segredos; `401` sem JWT; `403` para `MANAGER`); falham porque o módulo `payments` não existe
