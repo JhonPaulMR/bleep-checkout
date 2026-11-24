@@ -49,7 +49,7 @@
   - Teste primeiro: unit da máquina de estados (`canTransitionSale` e `canTransitionPayment`, bloqueando regressões como `COMPLETED` → `PENDING`/`OPEN`/`CANCELED`) e e2e de `GET /payments/config` (`200` com apenas `publicKey`, nunca expondo segredos; `401` sem JWT; `403` para `MANAGER`); falham porque o módulo `payments` não existe
   - Arquivos previstos: `apps/api/src/modules/payments/payment-gateway.interface.ts`, `apps/api/src/modules/payments/mercadopago.gateway.ts`, `apps/api/src/modules/payments/payment-state-machine.ts`, `apps/api/src/modules/payments/payment-state-machine.spec.ts`, `apps/api/src/modules/payments/payments.controller.ts`, `apps/api/src/modules/payments/payments.module.ts`, `apps/api/src/app.module.ts`, `apps/api/test/payments.e2e-spec.ts`
 
-- [ ] **Tarefa 5 — Implementar cobrança com cartão (`POST /sales/:id/payments/card`) para aprovado, recusado e em análise**
+- [x] **Tarefa 5 — Implementar cobrança com cartão (`POST /sales/:id/payments/card`) para aprovado, recusado e em análise**
   - Cobre: CA3, CA4, CA5, CA7 (lado da API — `idempotencyKey`), CA8 (propriedade e papel na cobrança)
   - Complexidade sugerida (orquestração): Média (`inherit`)
   - Teste primeiro: unit de `PaymentsService.payWithCard` e e2e com dublê de `PaymentGateway` cobrindo `approved` (`Sale` → `COMPLETED`), `rejected` (`Payment` → `DECLINED`, `Sale` permanece `OPEN` e aceita nova tentativa com nova `idempotencyKey`), `in_process`/`pending` (`Sale` → `PENDING`), recusa de valor no DTO (`400`), `external_reference: sale.id`, `idempotencyKey: payment.id` e `403` para `MANAGER` ou outro `OPERATOR`; falham porque o endpoint e método não existem
