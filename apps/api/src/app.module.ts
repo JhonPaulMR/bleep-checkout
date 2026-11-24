@@ -7,6 +7,8 @@ import { HttpExceptionFilter } from './common/filters/http-exception.filter.js';
 import { ResponseInterceptor } from './common/interceptors/response.interceptor.js';
 import { validateEnv } from './config/env.validation.js';
 import { AuthModule } from './modules/auth/auth.module.js';
+import { ProductsModule } from './modules/products/products.module.js';
+import { SalesModule } from './modules/sales/sales.module.js';
 import { UsersModule } from './modules/users/users.module.js';
 import { PrismaModule } from './prisma/prisma.module.js';
 
@@ -16,6 +18,8 @@ import { PrismaModule } from './prisma/prisma.module.js';
     PrismaModule,
     UsersModule,
     AuthModule,
+    ProductsModule,
+    SalesModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: JwtAuthGuard },

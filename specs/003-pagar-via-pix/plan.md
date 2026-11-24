@@ -37,7 +37,7 @@
   - Teste primeiro: teste de integração/e2e comprovando criação de `Sale` + `SaleItem` + `Payment` + `WebhookEvent` e violação de unicidade (`P2002`) ao tentar gravar `Payment.gatewayPaymentId` ou `WebhookEvent.gatewayEventId` duplicados; falha porque os models e enums não existem no `schema.prisma`
   - Arquivos previstos: `apps/api/prisma/schema.prisma`, `apps/api/prisma/migrations/<timestamp>_create_sales_and_payments/migration.sql`, `apps/api/prisma/seed.ts`, `apps/api/test/payments-schema.e2e-spec.ts`
 
-- [ ] **Tarefa 3 — Implementar catálogo mínimo (`GET /products`) e criação/consulta de vendas (`POST /sales`, `GET /sales/:id`) com total no servidor**
+- [x] **Tarefa 3 — Implementar catálogo mínimo (`GET /products`) e criação/consulta de vendas (`POST /sales`, `GET /sales/:id`) com total no servidor**
   - Cobre: CA1, CA8 (rotas de produtos e vendas)
   - Complexidade sugerida (orquestração): Média (`inherit`)
   - Teste primeiro: unit de `SalesService` (cálculo de `totalCents` a partir de `Product.priceCents`, recusa de lista vazia/quantidade inválida/produto inativo e regra de dono) e e2e (`POST /sales` `201`, `400` ao tentar enviar `totalCents`/`priceCents`/`transaction_amount`, `401` sem token, `403` para `MANAGER` ou `OPERATOR` diferente do dono); falham porque os módulos `products` e `sales` não existem
