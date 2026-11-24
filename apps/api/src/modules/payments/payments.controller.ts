@@ -75,4 +75,33 @@ export class PaymentsController {
   ) {
     return this.payments.payWithCard(saleId, body, request.user.sub);
   }
+
+  @Post('sales/:id/payments/pix')
+  @Roles(Role.OPERATOR)
+  @ApiOperation({
+    summary: 'Gera cobrança PIX com QR Code para uma venda em aberto',
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Cobrança PIX gerada e venda colocada em estado pendente',
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Sessão ausente, inválida ou expirada',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Acesso negado para outro operador ou gerente',
+  })
+  @ApiResponse({ status: 404, description: 'Venda não encontrada.' })
+  @ApiResponse({
+    status: 422,
+    description: 'A venda não está aberta para pagamento.',
+  })
+  payWithPix(
+    @Param('id') saleId: string,
+    @Req() request: { user: JwtPayload },
+  ) {
+    return this.payments.payWithPix(saleId, request.user.sub);
+  }
 }

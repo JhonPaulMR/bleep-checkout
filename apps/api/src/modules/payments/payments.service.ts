@@ -29,26 +29,7 @@ export class PaymentsService {
   ) {}
 
   async payWithCard(saleId: string, dto: PayWithCardDto, operatorId: string) {
-    const sale = await this.prisma.sale.findUnique({
-      where: { id: saleId },
-      include: { operator: { select: { email: true } } },
-    });
-
-    if (!sale) {
-      throw new NotFoundException('Venda não encontrada.');
-    }
-
-    if (sale.operatorId !== operatorId) {
-      throw new ForbiddenException(
-        'Você não tem permissão para cobrar esta venda.',
-      );
-    }
-
-    if (sale.status !== SaleStatus.OPEN) {
-      throw new UnprocessableEntityException(
-        'A venda não está aberta para pagamento.',
-      );
-    }
+    const sale = await this.findOpenOwnedSale(saleId, operatorId);
 
     const payment = await this.prisma.payment.create({
       data: {
@@ -148,5 +129,77 @@ export class PaymentsService {
 
       return { payment: updatedPayment, sale: updatedSale };
     });
+  }
+
+  async payWithPix(saleId: string, operatorId: string) {
+    const sale = await this.findOpenOwnedSale(saleId, operatorId);
+
+    const payment = await this.prisma.payment.create({
+      data: {
+        saleId: sale.id,
+        method: PaymentMethod.PIX,
+        status: PaymentStatus.PENDING,
+        amountCents: sale.totalCents,
+      },
+    });
+
+    const gatewayResult = await this.gateway.createPixPayment({
+      transactionAmount: sale.totalCents / 100,
+      payerEmail: sale.operator.email,
+      externalReference: sale.id,
+      idempotencyKey: payment.id,
+      description: `Venda #${sale.number}`,
+    });
+
+    return this.prisma.$transaction(async (tx) => {
+      if (!canTransitionSale(sale.status, SaleStatus.PENDING)) {
+        throw new UnprocessableEntityException(
+          'Transição de estado inválida para pagamento PIX.',
+        );
+      }
+
+      const updatedPayment = await tx.payment.update({
+        where: { id: payment.id },
+        data: {
+          gatewayPaymentId: gatewayResult.id,
+          qrCode: gatewayResult.qrCode ?? null,
+          qrCodeBase64: gatewayResult.qrCodeBase64 ?? null,
+        },
+      });
+
+      const updatedSale = await tx.sale.update({
+        where: { id: sale.id },
+        data: {
+          status: SaleStatus.PENDING,
+        },
+      });
+
+      return { payment: updatedPayment, sale: updatedSale };
+    });
+  }
+
+  private async findOpenOwnedSale(saleId: string, operatorId: string) {
+    const sale = await this.prisma.sale.findUnique({
+      where: { id: saleId },
+      include: { operator: { select: { email: true } } },
+    });
+
+    if (!sale) {
+      throw new NotFoundException('Venda não encontrada.');
+    }
+
+    if (sale.operatorId !== operatorId) {
+      throw new ForbiddenException(
+        'Você não tem permissão para cobrar esta venda.',
+      );
+    }
+
+    if (sale.status !== SaleStatus.OPEN) {
+      throw new UnprocessableEntityException(
+        'A venda não está aberta para pagamento.',
+      );
+    }
+
+    return sale;
   }
 }

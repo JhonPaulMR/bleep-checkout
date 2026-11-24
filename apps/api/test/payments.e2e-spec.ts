@@ -16,12 +16,13 @@ import { AppModule } from '../src/app.module.js';
 import {
   PAYMENT_GATEWAY,
   type CreateCardPaymentInput,
+  type CreatePixPaymentInput,
   type GatewayPaymentResult,
   type PaymentGateway,
 } from '../src/modules/payments/payment-gateway.interface.js';
 import { PrismaService } from '../src/prisma/prisma.service.js';
 
-describe('Pagamentos — /payments/config e /sales/:id/payments/card (e2e)', () => {
+describe('Pagamentos — /payments/config, /sales/:id/payments/card e /sales/:id/payments/pix (e2e)', () => {
   let app: INestApplication;
   let jwt: JwtService;
   let prisma: PrismaService;
@@ -32,7 +33,8 @@ describe('Pagamentos — /payments/config e /sales/:id/payments/card (e2e)', () 
 
   const createCardPaymentMock =
     vi.fn<(input: CreateCardPaymentInput) => Promise<GatewayPaymentResult>>();
-  const createPixPaymentMock = vi.fn();
+  const createPixPaymentMock =
+    vi.fn<(input: CreatePixPaymentInput) => Promise<GatewayPaymentResult>>();
   const getPaymentMock = vi.fn();
 
   const fakeGateway: PaymentGateway = {
@@ -434,6 +436,147 @@ describe('Pagamentos — /payments/config e /sales/:id/payments/card (e2e)', () 
         .expect(404);
 
       expect(response.body.message).toBe('Venda não encontrada.');
+    });
+  });
+
+  describe('POST /sales/:id/payments/pix', () => {
+    it('gera cobrança PIX com QR Code, envia valor do banco, external_reference e idempotencyKey, e transiciona Sale para PENDING (nunca COMPLETED)', async () => {
+      const operatorToken = await login(
+        process.env.SEED_OPERATOR_EMAIL!,
+        process.env.SEED_OPERATOR_PASSWORD!,
+      );
+      const sale = await createOpenSale(operatorToken, 1990);
+      const gatewayPaymentId = `mp-pix-${randomUUID()}`;
+      const qrCode =
+        '00020126580014br.gov.bcb.pix0136pix-bleep-checkout-sandbox-123';
+      const qrCodeBase64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwC';
+
+      createPixPaymentMock.mockResolvedValue({
+        id: gatewayPaymentId,
+        status: 'pending',
+        transactionAmount: sale.totalCents / 100,
+        externalReference: sale.id,
+        qrCode,
+        qrCodeBase64,
+      });
+
+      const response = await request(app.getHttpServer())
+        .post(`/sales/${sale.id}/payments/pix`)
+        .set('Authorization', `Bearer ${operatorToken}`)
+        .expect(201);
+
+      const { payment, sale: updatedSale } = response.body.data;
+
+      expect(payment.method).toBe(PaymentMethod.PIX);
+      expect(payment.status).toBe(PaymentStatus.PENDING);
+      expect(payment.amountCents).toBe(3980);
+      expect(payment.gatewayPaymentId).toBe(gatewayPaymentId);
+      expect(payment.qrCode).toBe(qrCode);
+      expect(payment.qrCodeBase64).toBe(qrCodeBase64);
+
+      expect(updatedSale.status).toBe(SaleStatus.PENDING);
+      expect(updatedSale.status).not.toBe(SaleStatus.COMPLETED);
+      expect(updatedSale.completedAt).toBeNull();
+
+      expect(createPixPaymentMock).toHaveBeenCalledTimes(1);
+      expect(createPixPaymentMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          transactionAmount: 39.8,
+          externalReference: sale.id,
+          idempotencyKey: payment.id,
+          payerEmail: process.env.SEED_OPERATOR_EMAIL,
+        }),
+      );
+
+      const saleInDb = await prisma.sale.findUniqueOrThrow({
+        where: { id: sale.id },
+        include: { payments: true },
+      });
+      expect(saleInDb.status).toBe(SaleStatus.PENDING);
+      expect(saleInDb.completedAt).toBeNull();
+      expect(saleInDb.payments).toHaveLength(1);
+      expect(saleInDb.payments[0].method).toBe(PaymentMethod.PIX);
+      expect(saleInDb.payments[0].status).toBe(PaymentStatus.PENDING);
+      expect(saleInDb.payments[0].gatewayPaymentId).toBe(gatewayPaymentId);
+      expect(saleInDb.payments[0].qrCode).toBe(qrCode);
+      expect(saleInDb.payments[0].qrCodeBase64).toBe(qrCodeBase64);
+    });
+
+    it('devolve 401 sem token JWT', async () => {
+      await request(app.getHttpServer())
+        .post(`/sales/${randomUUID()}/payments/pix`)
+        .expect(401);
+    });
+
+    it('devolve 403 para MANAGER', async () => {
+      const managerToken = await login(
+        process.env.SEED_MANAGER_EMAIL!,
+        process.env.SEED_MANAGER_PASSWORD!,
+      );
+
+      await request(app.getHttpServer())
+        .post(`/sales/${randomUUID()}/payments/pix`)
+        .set('Authorization', `Bearer ${managerToken}`)
+        .expect(403);
+    });
+
+    it('devolve 403 quando outro OPERATOR tenta gerar PIX da venda', async () => {
+      const operatorToken = await login(
+        process.env.SEED_OPERATOR_EMAIL!,
+        process.env.SEED_OPERATOR_PASSWORD!,
+      );
+      const sale = await createOpenSale(operatorToken, 1000);
+
+      const otherOp = await createTestOperator();
+      const otherToken = await login(otherOp.email, otherOp.password);
+
+      await request(app.getHttpServer())
+        .post(`/sales/${sale.id}/payments/pix`)
+        .set('Authorization', `Bearer ${otherToken}`)
+        .expect(403);
+
+      expect(createPixPaymentMock).not.toHaveBeenCalled();
+    });
+
+    it('devolve 404 para venda inexistente', async () => {
+      const operatorToken = await login(
+        process.env.SEED_OPERATOR_EMAIL!,
+        process.env.SEED_OPERATOR_PASSWORD!,
+      );
+
+      const response = await request(app.getHttpServer())
+        .post(`/sales/${randomUUID()}/payments/pix`)
+        .set('Authorization', `Bearer ${operatorToken}`)
+        .expect(404);
+
+      expect(response.body.message).toBe('Venda não encontrada.');
+    });
+
+    it('devolve 422 ao tentar gerar PIX para venda que não está em OPEN', async () => {
+      const operatorToken = await login(
+        process.env.SEED_OPERATOR_EMAIL!,
+        process.env.SEED_OPERATOR_PASSWORD!,
+      );
+      const sale = await createOpenSale(operatorToken, 1000);
+
+      createPixPaymentMock.mockResolvedValue({
+        id: `mp-pix-${randomUUID()}`,
+        status: 'pending',
+        transactionAmount: 20,
+        externalReference: sale.id,
+        qrCode: 'qr-1',
+        qrCodeBase64: 'b64-1',
+      });
+
+      await request(app.getHttpServer())
+        .post(`/sales/${sale.id}/payments/pix`)
+        .set('Authorization', `Bearer ${operatorToken}`)
+        .expect(201);
+
+      await request(app.getHttpServer())
+        .post(`/sales/${sale.id}/payments/pix`)
+        .set('Authorization', `Bearer ${operatorToken}`)
+        .expect(422);
     });
   });
 });

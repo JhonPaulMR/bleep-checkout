@@ -55,7 +55,7 @@
   - Teste primeiro: unit de `PaymentsService.payWithCard` e e2e com dublê de `PaymentGateway` cobrindo `approved` (`Sale` → `COMPLETED`), `rejected` (`Payment` → `DECLINED`, `Sale` permanece `OPEN` e aceita nova tentativa com nova `idempotencyKey`), `in_process`/`pending` (`Sale` → `PENDING`), recusa de valor no DTO (`400`), `external_reference: sale.id`, `idempotencyKey: payment.id` e `403` para `MANAGER` ou outro `OPERATOR`; falham porque o endpoint e método não existem
   - Arquivos previstos: `apps/api/src/modules/payments/dto/pay-with-card.dto.ts`, `apps/api/src/modules/payments/payments.service.ts`, `apps/api/src/modules/payments/payments.service.spec.ts`, `apps/api/src/modules/payments/payments.controller.ts`, `apps/api/test/payments.e2e-spec.ts`
 
-- [ ] **Tarefa 6 — Implementar cobrança PIX (`POST /sales/:id/payments/pix`) com QR Code e status `PENDING`**
+- [x] **Tarefa 6 — Implementar cobrança PIX (`POST /sales/:id/payments/pix`) com QR Code e status `PENDING`**
   - Cobre: CA6 (lado da API), CA8 (propriedade e papel no PIX)
   - Complexidade sugerida (orquestração): Fácil (`flash`)
   - Teste primeiro: unit de `PaymentsService.payWithPix` e e2e com dublê de `PaymentGateway` provando gravação de `Payment` (`PIX`, `PENDING`), `gatewayPaymentId` e `qrCode`, transição de `Sale` para `PENDING` (nunca `COMPLETED`), `external_reference: sale.id`, `idempotencyKey: payment.id` e `403` para `MANAGER` ou outro `OPERATOR`; falham porque o endpoint PIX não existe

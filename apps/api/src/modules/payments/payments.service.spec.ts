@@ -350,4 +350,136 @@ describe('PaymentsService', () => {
       },
     );
   });
+
+  describe('payWithPix', () => {
+    it('cria Payment PIX PENDING antes do gateway, envia valor do banco, externalReference e idempotencyKey, grava gatewayPaymentId e qrCode/qrCodeBase64 e transiciona Sale para PENDING', async () => {
+      prisma.sale.findUnique.mockResolvedValue(baseSale);
+
+      const createdPayment = {
+        id: 'pay-pix-1',
+        saleId: 'sale-1',
+        method: PaymentMethod.PIX,
+        status: PaymentStatus.PENDING,
+        amountCents: 3580,
+        gatewayPaymentId: null,
+        qrCode: null,
+        qrCodeBase64: null,
+        createdAt: new Date('2026-11-24T12:05:00.000Z'),
+      };
+
+      const callOrder: string[] = [];
+      prisma.payment.create.mockImplementation(async () => {
+        callOrder.push('payment.create');
+        return createdPayment;
+      });
+      gateway.createPixPayment.mockImplementation(async () => {
+        callOrder.push('gateway.createPixPayment');
+        return {
+          id: 'mp-pix-1001',
+          status: 'pending',
+          transactionAmount: 35.8,
+          externalReference: 'sale-1',
+          qrCode: '00020126580014br.gov.bcb.pix0136fake-qr',
+          qrCodeBase64: 'iVBORw0KGgoAAAANSUhEUg==',
+        };
+      });
+
+      const updatedPayment = {
+        ...createdPayment,
+        gatewayPaymentId: 'mp-pix-1001',
+        qrCode: '00020126580014br.gov.bcb.pix0136fake-qr',
+        qrCodeBase64: 'iVBORw0KGgoAAAANSUhEUg==',
+      };
+      const updatedSale = {
+        id: baseSale.id,
+        number: baseSale.number,
+        operatorId: baseSale.operatorId,
+        status: SaleStatus.PENDING,
+        totalCents: baseSale.totalCents,
+        createdAt: baseSale.createdAt,
+        completedAt: null,
+      };
+      prisma.payment.update.mockResolvedValue(updatedPayment);
+      prisma.sale.update.mockResolvedValue(updatedSale);
+
+      const result = await service.payWithPix('sale-1', 'op-1');
+
+      expect(callOrder).toEqual(['payment.create', 'gateway.createPixPayment']);
+      expect(prisma.payment.create).toHaveBeenCalledWith({
+        data: {
+          saleId: 'sale-1',
+          method: PaymentMethod.PIX,
+          status: PaymentStatus.PENDING,
+          amountCents: 3580,
+        },
+      });
+      expect(gateway.createPixPayment).toHaveBeenCalledWith({
+        transactionAmount: 35.8,
+        payerEmail: 'operador@bleep.local',
+        externalReference: 'sale-1',
+        idempotencyKey: 'pay-pix-1',
+        description: 'Venda #10',
+      });
+      expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+      expect(prisma.payment.update).toHaveBeenCalledWith({
+        where: { id: 'pay-pix-1' },
+        data: {
+          gatewayPaymentId: 'mp-pix-1001',
+          qrCode: '00020126580014br.gov.bcb.pix0136fake-qr',
+          qrCodeBase64: 'iVBORw0KGgoAAAANSUhEUg==',
+        },
+      });
+      expect(prisma.sale.update).toHaveBeenCalledWith({
+        where: { id: 'sale-1' },
+        data: {
+          status: SaleStatus.PENDING,
+        },
+      });
+      expect(result).toEqual({
+        payment: updatedPayment,
+        sale: updatedSale,
+      });
+      expect(result.sale.status).not.toBe(SaleStatus.COMPLETED);
+      expect(result.sale.completedAt).toBeNull();
+    });
+
+    it('rejeita com NotFoundException quando a venda não existe', async () => {
+      prisma.sale.findUnique.mockResolvedValue(null);
+
+      const error = await service
+        .payWithPix('sale-inexistente', 'op-1')
+        .catch((e) => e);
+
+      expect(error).toBeInstanceOf(NotFoundException);
+      expect(prisma.payment.create).not.toHaveBeenCalled();
+      expect(gateway.createPixPayment).not.toHaveBeenCalled();
+    });
+
+    it('rejeita com ForbiddenException quando outro operador tenta gerar PIX da venda', async () => {
+      prisma.sale.findUnique.mockResolvedValue(baseSale);
+
+      const error = await service
+        .payWithPix('sale-1', 'op-2')
+        .catch((e) => e);
+
+      expect(error).toBeInstanceOf(ForbiddenException);
+      expect(prisma.payment.create).not.toHaveBeenCalled();
+      expect(gateway.createPixPayment).not.toHaveBeenCalled();
+    });
+
+    it.each([SaleStatus.COMPLETED, SaleStatus.PENDING, SaleStatus.CANCELED])(
+      'rejeita com UnprocessableEntityException quando a venda está em %s',
+      async (status) => {
+        prisma.sale.findUnique.mockResolvedValue({ ...baseSale, status });
+
+        const error = await service
+          .payWithPix('sale-1', 'op-1')
+          .catch((e) => e);
+
+        expect(error).toBeInstanceOf(UnprocessableEntityException);
+        expect(prisma.payment.create).not.toHaveBeenCalled();
+        expect(gateway.createPixPayment).not.toHaveBeenCalled();
+      },
+    );
+  });
 });
