@@ -3,6 +3,9 @@ const REQUIRED_VARS = [
   'DIRECT_URL',
   'JWT_SECRET',
   'WEB_ORIGIN',
+  'MP_ACCESS_TOKEN',
+  'MP_PUBLIC_KEY',
+  'MP_WEBHOOK_SECRET',
 ] as const;
 
 export function validateEnv(config: Record<string, unknown>) {

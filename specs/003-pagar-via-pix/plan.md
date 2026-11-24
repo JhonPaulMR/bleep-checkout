@@ -25,7 +25,7 @@
 
 ## Tarefas
 
-- [ ] **Tarefa 1 — Configurar variáveis do Mercado Pago, SDK oficial e CI**
+- [x] **Tarefa 1 — Configurar variáveis do Mercado Pago, SDK oficial e CI**
   - Cobre: CA12
   - Complexidade sugerida (orquestração): Fácil (`flash`)
   - Teste primeiro: unit de `validateEnv` garantindo erro no boot quando `MP_ACCESS_TOKEN`, `MP_PUBLIC_KEY` ou `MP_WEBHOOK_SECRET` estiverem ausentes/vazias e sucesso quando presentes; falha porque as três variáveis ainda não estão em `REQUIRED_VARS`

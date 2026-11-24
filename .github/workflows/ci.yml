@@ -40,6 +40,9 @@ jobs:
       SEED_MANAGER_PASSWORD: Gerente@123
       SEED_OPERATOR_EMAIL: operador@teste.local
       SEED_OPERATOR_PASSWORD: Operador@123
+      MP_ACCESS_TOKEN: mp-access-token-descartavel-somente-para-o-ci
+      MP_PUBLIC_KEY: mp-public-key-descartavel-somente-para-o-ci
+      MP_WEBHOOK_SECRET: mp-webhook-secret-descartavel-somente-para-o-ci
 
     steps:
       - uses: actions/checkout@v7
