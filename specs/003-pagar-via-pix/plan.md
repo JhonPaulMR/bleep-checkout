@@ -73,7 +73,7 @@
   - Teste primeiro: unit de `WebhooksService` e e2e com notificação assinada + dublê de `PaymentGateway` cobrindo: venda `PENDING` (cartão em análise ou PIX) + webhook `approved` → `COMPLETED`; `PENDING` + `rejected` → `OPEN`; repetição do mesmo webhook (ou resposta síncrona + webhook) → `200` sem duplicar nada; notificação atrasada (`pending`/`rejected`) em venda já `COMPLETED` → `200` mantendo `COMPLETED`; divergência de `external_reference` ou valor não conclui venda; falham porque o processamento completo não existe
   - Arquivos previstos: `apps/api/src/modules/webhooks/webhooks.service.ts`, `apps/api/src/modules/webhooks/webhooks.service.spec.ts`, `apps/api/test/webhooks.e2e-spec.ts`
 
-- [ ] **Tarefa 9 — Construir fluxo de caixa e pagamento no frontend (Card Payment Brick, PIX, polling e estados de erro)**
+- [x] **Tarefa 9 — Construir fluxo de caixa e pagamento no frontend (Card Payment Brick, PIX, polling e estados de erro)**
   - Cobre: CA2 (lado do front), CA3 (front), CA4 (front), CA5 (front), CA6 (front), CA7 (front)
   - Complexidade sugerida (orquestração): Média (`inherit`)
   - Teste primeiro: unit do `CheckoutService` (endpoints `/products`, `/sales`, `/payments/config`, `/sales/:id/payments/card`, `/sales/:id/payments/pix` e `GET /sales/:id`, nunca enviando preço na cobrança) e unit da `CheckoutPage` (criação de venda, inicialização do Brick com `publicKey` da API e `payer.email`, exibição de `COMPLETED`, `DECLINED` com nova tentativa, `PENDING` com "Estamos confirmando o pagamento" + polling, PIX com QR Code e estado pendente, botão desabilitado durante envio e erro de rede sem marcar como pago); falham porque o serviço e a página completa ainda não existem
