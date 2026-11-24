@@ -31,7 +31,7 @@
   - Teste primeiro: unit de `validateEnv` garantindo erro no boot quando `MP_ACCESS_TOKEN`, `MP_PUBLIC_KEY` ou `MP_WEBHOOK_SECRET` estiverem ausentes/vazias e sucesso quando presentes; falha porque as três variáveis ainda não estão em `REQUIRED_VARS`
   - Arquivos previstos: `apps/api/package.json`, `apps/api/.env.example`, `apps/api/src/config/env.validation.ts`, `apps/api/src/config/env.validation.spec.ts`, `.github/workflows/ci.yml`
 
-- [ ] **Tarefa 2 — Modelar `Product`, `Sale`, `SaleItem`, `Payment` e `WebhookEvent` com migration e seed de produtos**
+- [x] **Tarefa 2 — Modelar `Product`, `Sale`, `SaleItem`, `Payment` e `WebhookEvent` com migration e seed de produtos**
   - Cobre: pré-requisito estrutural de CA1, CA3, CA4, CA5, CA6, CA11 (passo técnico)
   - Complexidade sugerida (orquestração): Média (`inherit`)
   - Teste primeiro: teste de integração/e2e comprovando criação de `Sale` + `SaleItem` + `Payment` + `WebhookEvent` e violação de unicidade (`P2002`) ao tentar gravar `Payment.gatewayPaymentId` ou `WebhookEvent.gatewayEventId` duplicados; falha porque os models e enums não existem no `schema.prisma`

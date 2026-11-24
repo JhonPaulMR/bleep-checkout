@@ -15,6 +15,28 @@ enum Role {
   OPERATOR
 }
 
+enum SaleStatus {
+  OPEN
+  PENDING
+  COMPLETED
+  CANCELED
+}
+
+enum PaymentMethod {
+  CARD
+  PIX
+  CUSTOMER_CREDIT
+  EXTERNAL_CREDIT
+  EXTERNAL_DEBIT
+}
+
+enum PaymentStatus {
+  PENDING
+  APPROVED
+  DECLINED
+  ABANDONED
+}
+
 model User {
   id           String   @id @default(uuid())
   name         String
@@ -24,7 +46,69 @@ model User {
   createdById  String?
   createdBy    User?    @relation("CreatedUsers", fields: [createdById], references: [id])
   createdUsers User[]   @relation("CreatedUsers")
+  sales        Sale[]
   createdAt    DateTime @default(now())
 
   @@index([createdById])
+}
+
+model Product {
+  id         String     @id @default(uuid())
+  name       String
+  barcode    String     @unique
+  priceCents Int
+  active     Boolean    @default(true)
+  createdAt  DateTime   @default(now())
+  saleItems  SaleItem[]
+}
+
+model Sale {
+  id          String     @id @default(uuid())
+  number      Int        @unique @default(autoincrement())
+  operatorId  String
+  operator    User       @relation(fields: [operatorId], references: [id])
+  status      SaleStatus @default(OPEN)
+  totalCents  Int
+  createdAt   DateTime   @default(now())
+  completedAt DateTime?
+  items       SaleItem[]
+  payments    Payment[]
+
+  @@index([operatorId])
+}
+
+model SaleItem {
+  id             String  @id @default(uuid())
+  saleId         String
+  sale           Sale    @relation(fields: [saleId], references: [id])
+  productId      String
+  product        Product @relation(fields: [productId], references: [id])
+  quantity       Int
+  unitPriceCents Int
+
+  @@unique([saleId, productId])
+  @@index([saleId])
+  @@index([productId])
+}
+
+model Payment {
+  id               String        @id @default(uuid())
+  saleId           String
+  sale             Sale          @relation(fields: [saleId], references: [id])
+  method           PaymentMethod
+  status           PaymentStatus
+  amountCents      Int
+  gatewayPaymentId String?       @unique
+  qrCode           String?
+  qrCodeBase64     String?
+  createdAt        DateTime      @default(now())
+
+  @@index([saleId])
+}
+
+model WebhookEvent {
+  id             String   @id @default(uuid())
+  gatewayEventId String   @unique
+  payload        Json
+  processedAt    DateTime @default(now())
 }
