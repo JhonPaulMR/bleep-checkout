@@ -61,7 +61,7 @@
   - Teste primeiro: unit de `PaymentsService.payWithPix` e e2e com dublê de `PaymentGateway` provando gravação de `Payment` (`PIX`, `PENDING`), `gatewayPaymentId` e `qrCode`, transição de `Sale` para `PENDING` (nunca `COMPLETED`), `external_reference: sale.id`, `idempotencyKey: payment.id` e `403` para `MANAGER` ou outro `OPERATOR`; falham porque o endpoint PIX não existe
   - Arquivos previstos: `apps/api/src/modules/payments/payments.service.ts`, `apps/api/src/modules/payments/payments.service.spec.ts`, `apps/api/src/modules/payments/payments.controller.ts`, `apps/api/test/payments.e2e-spec.ts`
 
-- [ ] **Tarefa 7 — Implementar rota pública de webhook (`POST /webhooks/mercadopago`) com verificação de assinatura HMAC-SHA256**
+- [x] **Tarefa 7 — Implementar rota pública de webhook (`POST /webhooks/mercadopago`) com verificação de assinatura HMAC-SHA256**
   - Cobre: CA9
   - Complexidade sugerida (orquestração): Alta (`inherit`)
   - Teste primeiro: unit do validador de assinatura (`id:<data.id>;request-id:<x-request-id>;ts:<ts>;`, HMAC-SHA256 em tempo constante com `crypto.timingSafeEqual` e checagem de tamanho) e e2e em `POST /webhooks/mercadopago` sem JWT (`@Public()`): assinatura válida responde `200`, assinatura inválida/ausente/malformada responde `401` sem chamar o gateway nem alterar o banco; falham porque o módulo `webhooks` não existe
