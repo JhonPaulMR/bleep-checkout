@@ -1,6 +1,6 @@
 ---
 issue: 3
-status: rascunho   # rascunho | aprovada
+status: aprovada
 ---
 
 # US06 — Pagar venda via gateway (Mercado Pago Checkout Transparente: Cartão e PIX)
