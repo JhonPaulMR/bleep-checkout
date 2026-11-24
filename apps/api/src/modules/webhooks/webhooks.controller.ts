@@ -35,7 +35,7 @@ export class WebhooksController {
     @Headers('x-request-id') requestId: string | undefined,
     @Query() query: Record<string, unknown>,
     @Body() body: Record<string, unknown>,
-  ): { received: true } {
+  ): Promise<{ received: true }> {
     return this.webhooks.handleMercadoPago({
       signatureHeader,
       requestId,

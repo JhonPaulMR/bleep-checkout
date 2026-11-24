@@ -67,7 +67,7 @@
   - Teste primeiro: unit do validador de assinatura (`id:<data.id>;request-id:<x-request-id>;ts:<ts>;`, HMAC-SHA256 em tempo constante com `crypto.timingSafeEqual` e checagem de tamanho) e e2e em `POST /webhooks/mercadopago` sem JWT (`@Public()`): assinatura válida responde `200`, assinatura inválida/ausente/malformada responde `401` sem chamar o gateway nem alterar o banco; falham porque o módulo `webhooks` não existe
   - Arquivos previstos: `apps/api/src/modules/webhooks/webhook-signature.validator.ts`, `apps/api/src/modules/webhooks/webhook-signature.validator.spec.ts`, `apps/api/src/modules/webhooks/webhooks.controller.ts`, `apps/api/src/modules/webhooks/webhooks.service.ts`, `apps/api/src/modules/webhooks/webhooks.module.ts`, `apps/api/src/app.module.ts`, `apps/api/test/webhooks.e2e-spec.ts`
 
-- [ ] **Tarefa 8 — Processar webhook consultando gateway, validando pedido/valor e garantindo idempotência e máquina de estados**
+- [x] **Tarefa 8 — Processar webhook consultando gateway, validando pedido/valor e garantindo idempotência e máquina de estados**
   - Cobre: CA10, CA11
   - Complexidade sugerida (orquestração): Alta (`inherit`)
   - Teste primeiro: unit de `WebhooksService` e e2e com notificação assinada + dublê de `PaymentGateway` cobrindo: venda `PENDING` (cartão em análise ou PIX) + webhook `approved` → `COMPLETED`; `PENDING` + `rejected` → `OPEN`; repetição do mesmo webhook (ou resposta síncrona + webhook) → `200` sem duplicar nada; notificação atrasada (`pending`/`rejected`) em venda já `COMPLETED` → `200` mantendo `COMPLETED`; divergência de `external_reference` ou valor não conclui venda; falham porque o processamento completo não existe
