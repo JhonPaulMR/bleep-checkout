@@ -76,11 +76,11 @@
 | **ID8 · Dados** | Acesso ao banco **só** via `PrismaService`. Operação que altera saldo, venda e pagamento juntos roda em `prisma.$transaction`. O débito de crédito é um update condicional (saldo ≥ total) para não deixar saldo negativo nem sob concorrência. Dinheiro em **centavos inteiros** (`Int`). |
 | **ID9 · Autenticação** | `@nestjs/jwt`. `JwtAuthGuard` **global**, liberado com `@Public()` só no login e no webhook. `RolesGuard` **global** (registrado depois de `JwtAuthGuard`) com `@Roles('MANAGER' \| 'OPERATOR')` e comparação estrita (`required.some(r => r === user.role)`): `MANAGER` não opera o caixa e `OPERATOR` não acessa cadastros (RN13). Token JWT com validade de **12 horas** (somado ao timeout de 30 minutos por inatividade no front). Senha com `argon2`; o hash nunca sai na resposta. |
 | **ID10 · Resposta e erro** | `ResponseInterceptor` global: sucesso sai como `{ data }`. `HttpExceptionFilter` global: erro sai como `{ statusCode, error, message, path, timestamp }`. Erros de domínio têm classe própria e viram **409** (conflito, ex.: código ou CPF duplicado) ou **422** (regra violada, ex.: saldo insuficiente). |
-| **ID17 · Segredos** | `ConfigModule` com validação das variáveis no boot (a API não sobe sem elas): `DATABASE_URL`, `DIRECT_URL`, `JWT_SECRET`, `MP_ACCESS_TOKEN`, `MP_WEBHOOK_SECRET`, `WEB_ORIGIN`. Só o `.env.example` vai para o repositório; o `.env` fica no `.gitignore`; os valores de produção ficam nas variáveis do Render e da Vercel. |
+| **ID17 · Segredos** | `ConfigModule` com validação das variáveis no boot (a API não sobe sem elas): `DATABASE_URL`, `DIRECT_URL`, `JWT_SECRET`, `MP_ACCESS_TOKEN`, `MP_PUBLIC_KEY`, `MP_WEBHOOK_SECRET`, `WEB_ORIGIN`. Só o `.env.example` vai para o repositório; o `.env` fica no `.gitignore`; os valores de produção ficam nas variáveis do Render e da Vercel. |
 | **ID18 · CI** | GitHub Actions em todo PR para a `main`: lint + teste dos dois apps + e2e da API com Postgres como *service* do job, além do check `explicacao`. |
 | **ID19 · Deploy** | API no **Render** (Web Service). Banco no **Neon** com pooling: a `DATABASE_URL` (host `-pooler`) vai para o adapter em runtime; a `DIRECT_URL` (sem pooler) vai para o `prisma.config.ts` e é usada pelo `prisma migrate deploy`. Front na **Vercel**, com rewrite de SPA para `index.html`. CORS liberado só para `WEB_ORIGIN`. |
-| **ID20 · Gateway** | **Mercado Pago em sandbox**, atrás da interface `PaymentGateway` (implementação real no módulo `payments`, fake nos testes; o TDD não depende de rede). A cobrança PIX nasce **no servidor**: um `Payment` ligado à `Sale`, com o `gatewayPaymentId` e o QR Code devolvidos pelo gateway. |
-| **ID21 · Webhook** | `POST /webhooks/mercadopago` (`@Public()`), nesta ordem: (1) valida o `x-signature` (HMAC-SHA256 com `MP_WEBHOOK_SECRET`) e recusa o que não bater; (2) grava o `WebhookEvent` — o UNIQUE em `gatewayEventId` descarta notificação repetida; (3) **consulta o pagamento no gateway**, sem confiar só no corpo da notificação; (4) só então atualiza `Payment` e `Sale`. A simulação de confirmação existe só fora de produção e passa pelo mesmo handler. |
+| **ID20 · Gateway** | **Mercado Pago em sandbox (Checkout Transparente)**, atrás da interface `PaymentGateway` (implementação real `MercadoPagoGateway` no módulo `payments`, dublê nos testes; o TDD não depende de rede). Cartão (Card Payment Brick) e PIX nascem **no servidor**: um `Payment` ligado à `Sale`, com valor calculado a partir do banco (`Product.priceCents`), `external_reference = sale.id`, `idempotencyKey = payment.id`, `gatewayPaymentId` e QR Code (no PIX) devolvidos pelo gateway. |
+| **ID21 · Webhook** | `POST /webhooks/mercadopago` (`@Public()`), nesta ordem: (1) valida o `x-signature` (HMAC-SHA256 com `MP_WEBHOOK_SECRET` e comparação em tempo constante `crypto.timingSafeEqual`) e recusa com `401` o que não bater; (2) ignora eventos que não sejam `type=payment`; (3) **consulta o pagamento no gateway** (`PaymentGateway.getPayment`), sem confiar só no corpo da notificação (404 encerra em `200`; falhas transitórias relançam erro para retry); (4) dentro de `prisma.$transaction`, grava `WebhookEvent` (`UNIQUE` em `gatewayEventId`), confere `external_reference` e valor, e aplica apenas transições permitidas pela máquina de estados com `updateMany` condicional em `Payment` e `Sale`. |
 
 ### 🌐 2.2. O contrato da API
 
@@ -163,7 +163,7 @@
 | Crédito do cliente (movimentação) | `CreditTransaction` | `id`, `customerId`, `saleId?`, `type` (`INITIAL` \| `TOP_UP` \| `SALE_DEBIT`), `amountCents`, `createdAt` |
 | Venda (Venda pendente) | `Sale` | `id`, `number`, `operatorId`, `customerId?`, `status` (`OPEN` \| `PENDING` \| `COMPLETED` \| `CANCELED`), `totalCents`, `createdAt`, `completedAt?` |
 | Item de venda (Quantidade) | `SaleItem` | `id`, `saleId`, `productId`, `quantity` (> 0), `unitPriceCents`; único (`saleId`, `productId`) |
-| Pagamento / Forma de pagamento (PIX, Pagamento externo) | `Payment` | `id`, `saleId`, `method` (`PIX` \| `CUSTOMER_CREDIT` \| `EXTERNAL_CREDIT` \| `EXTERNAL_DEBIT`), `status` (`PENDING` \| `APPROVED` \| `DECLINED` \| `ABANDONED`), `amountCents`, `gatewayPaymentId?`, `qrCode?`, `createdAt` |
+| Pagamento / Forma de pagamento (Cartão, PIX, Pagamento externo) | `Payment` | `id`, `saleId`, `method` (`CARD` \| `PIX` \| `CUSTOMER_CREDIT` \| `EXTERNAL_CREDIT` \| `EXTERNAL_DEBIT`), `status` (`PENDING` \| `APPROVED` \| `DECLINED` \| `ABANDONED`), `amountCents`, `gatewayPaymentId?` (único), `qrCode?`, `qrCodeBase64?`, `createdAt` |
 | (confirmação do gateway) | `WebhookEvent` | `id`, `gatewayEventId` (único), `payload`, `processedAt` |
 
 > O `CreditTransaction` é a trilha interna de cada movimentação de saldo,
@@ -186,7 +186,7 @@
 > venda e Cliente 1:N Venda, e a separação entre pedido (`Sale`) e pagamento
 > (`Payment`) do ID20.
 >
-> **Já no banco:** `User` (com o enum `Role` e a autorrelação `1:N` `createdById` → `User`), criado na Issue #10 (`20261027015348_create_user`) e evoluído na Issue #11 (`20261121130721_add_user_created_by`). As demais entidades são o desenho previsto e nascem com as histórias que as usam.
+> **Já no banco:** `User` (`20261027015348_create_user` / `20261121130721_add_user_created_by`) e `Product`, `Sale`, `SaleItem`, `Payment` e `WebhookEvent` (`20261124181202_create_sales_and_payments`, Issue #3). `Customer` e `CreditTransaction` nascem com as histórias que os usam.
 
 ```mermaid
 erDiagram
@@ -270,6 +270,38 @@ erDiagram
 > 🔒 Credenciais **nunca** aparecem no repositório — nem em código, nem em
 > YAML, nem em doc. Só nos *secrets* da plataforma.
 
+### 🔄 5.4. Fluxo de Pagamento, Máquina de Estados e Idempotência
+
+**Quem decide o status do pedido (e por que o navegador não decide):**
+- O navegador está fora do controle do servidor: qualquer pessoa pode abrir o DevTools, alterar valores ou forjar requisições dizendo que o pagamento foi aprovado. Por isso, o navegador **nunca** envia o preço da venda e **nunca** decide se a venda foi paga.
+- O preço (`totalCents`) é sempre calculado no servidor a partir de `Product.priceCents` no banco (`POST /sales`). Os dados do cartão trafegam diretamente do **Card Payment Brick** para o Mercado Pago e nunca tocam a API do Bleep Checkout, que recebe apenas o token de uso único.
+- O status de `Sale` e `Payment` só muda pelo que o **gateway (Mercado Pago)** informa diretamente ao servidor, servidor a servidor, por dois canais confiáveis:
+  1. **Resposta síncrona da cobrança** (`POST /v1/payments` via `MercadoPagoGateway` com `MP_ACCESS_TOKEN`).
+  2. **Webhook assinado** (`POST /webhooks/mercadopago`, rota `@Public()` protegida por assinatura HMAC-SHA256 em tempo constante `crypto.timingSafeEqual` com `MP_WEBHOOK_SECRET`), que sempre consulta o status real diretamente no gateway (`GET /v1/payments/{id}`) antes de atualizar qualquer registro.
+
+**Máquina de estados (`Sale.status` e `Payment.status`):**
+
+```mermaid
+stateDiagram-v2
+  [*] --> OPEN: POST /sales
+  OPEN --> COMPLETED: Cartão approved (cobrança ou webhook)
+  OPEN --> PENDING: Cartão in_process/pending ou PIX gerado
+  PENDING --> COMPLETED: Webhook confirma approved
+  PENDING --> OPEN: Webhook confirma rejected (nova tentativa)
+  COMPLETED --> [*]
+```
+
+| Entidade | Transições permitidas | Transições proibidas (recusadas / ignoradas) |
+| :--- | :--- | :--- |
+| **`Sale.status`** | `OPEN → COMPLETED`, `OPEN → PENDING`, `PENDING → COMPLETED`, `PENDING → OPEN` | `COMPLETED → OPEN \| PENDING \| CANCELED` (notificação atrasada nunca regride venda paga); `CANCELED → OPEN \| PENDING \| COMPLETED`; qualquer no-op (`X → X`) |
+| **`Payment.status`** | `PENDING → APPROVED`, `PENDING → DECLINED`, `PENDING → ABANDONED` | Qualquer saída de `APPROVED`, `DECLINED` ou `ABANDONED`; `PENDING → PENDING` |
+
+**Como a idempotência é garantida dos dois lados:**
+1. **Lado da cobrança (servidor → gateway):** o registro `Payment` é criado no banco **antes** de chamar o Mercado Pago, e o seu `id` é enviado em `requestOptions.idempotencyKey` (`X-Idempotency-Key`). Se houver falha de rede ou retentativa da mesma tentativa, o gateway devolve o resultado original sem cobrar duas vezes. Uma nova tentativa após recusa (`DECLINED`) cria outro `Payment` com nova chave.
+2. **Lado do recebimento (gateway → servidor):**
+   - Restrições `UNIQUE` no PostgreSQL em `Payment.gatewayPaymentId` e `WebhookEvent.gatewayEventId` impedem duplicidade mesmo sob entregas simultâneas.
+   - A atualização de `Payment` e `Sale` ocorre dentro de `prisma.$transaction` com `updateMany` condicional no status esperado (`where: { id, status }`) e guarda da máquina de estados (`canTransitionPayment` / `canTransitionSale`): efeitos colaterais só rodam quando há transição real permitida, e a transição da `Sale` depende da transição efetiva do `Payment` vinculado. Notificações repetidas (incluindo resposta síncrona `approved` seguida de webhook `approved`) ou atrasadas respondem `200` sem efeito colateral.
+
 ---
 
 ## 🗺️ 6. Mapa de Domínios
@@ -283,6 +315,10 @@ erDiagram
 | :------ | :------------- | :---- | :----------------- | :-- |
 | Autenticação | `apps/api/src/modules/auth` | `JwtAuthGuard` global (`@Public()` em `/auth/login`) | `UsersService` / `PrismaService` | US09 (#10) |
 | Usuários / Operadores | `apps/api/src/modules/users` | `JwtAuthGuard` + `RolesGuard` (`@Roles(Role.MANAGER)` em `POST/GET /users`; regra de dono em `GET /users/:id`) | `UsersService` / `PrismaService` | US10 (#11) |
+| Produtos (catálogo mínimo) | `apps/api/src/modules/products` | `JwtAuthGuard` + `RolesGuard` (`@Roles(Role.OPERATOR)` em `GET /products`) | `ProductsService` / `PrismaService` | US06 (#3) |
+| Vendas | `apps/api/src/modules/sales` | `JwtAuthGuard` + `RolesGuard` (`@Roles(Role.OPERATOR)` em `POST /sales` e `GET /sales/:id`; regra de dono `operatorId === sub`) | `SalesService` / `PrismaService` | US06 (#3) |
+| Pagamentos | `apps/api/src/modules/payments` | `JwtAuthGuard` + `RolesGuard` (`@Roles(Role.OPERATOR)` em `GET /payments/config` e `POST /sales/:id/payments/card\|pix`; regra de dono) | `PaymentsService` / `PrismaService` + `PaymentGateway` | US06 (#3) |
+| Webhooks | `apps/api/src/modules/webhooks` | `@Public()` em `POST /webhooks/mercadopago` protegido por HMAC-SHA256 (`WebhookSignatureValidator`) | `WebhooksService` / `PrismaService` + `PaymentGateway` | US06 (#3) |
 
 ---
 
@@ -294,6 +330,7 @@ erDiagram
 | 09/10/2026 | 1.0.1 | `/utf-setup`: lint da API ratificado como **oxlint**, o padrão do gerador do NestJS 12+; o web segue com ESLint (`angular-eslint`) |
 | 25/10/2026 | 1.0.2 | Fechamento da Atividade 08: adoção de **npm workspaces** (revoga o "sem workspaces" da 1.0.0, exigido pelo `npm install` único e pelo `npm ci` do CI), ESM ratificado, Prisma 7 + `@nestjs/config` instalados sem nenhum `model`, `.env.example` com `DATABASE_URL` e `DIRECT_URL` |
 | 21/11/2026 | 1.0.3 | Fechamento da US10 (#11 / Atividade 13): `RolesGuard` global estrito, validade do token (12h + 30 min inatividade), justificativa do `sessionStorage`, relação `1:N` `User.createdById` no ER e Mapa de Domínios atualizado |
+| 24/11/2026 | 1.0.4 | Fechamento da US06 (#3 / Atividade 14): Mercado Pago Checkout Transparente (Cartão + PIX) em sandbox, `MP_PUBLIC_KEY` no boot, `Product`/`Sale`/`SaleItem`/`Payment`/`WebhookEvent` no banco, seção §5.4 (máquina de estados com transições proibidas, autoridade do servidor e idempotência dos dois lados) e Mapa de Domínios atualizado |
 
 ---
 

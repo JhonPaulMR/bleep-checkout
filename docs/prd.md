@@ -131,7 +131,7 @@ Essas relações representam o núcleo do domínio sem definir banco, endpoints 
 
 **Regras relacionadas:** RN03, RN08, RN09
 
-### US06 — Pagar via PIX · `Must Have` · `M` · Status: `🟡 Ready`
+### US06 — Pagar via PIX · `Must Have` · `M` · Status: `🟢 Live`
 
 **Como** operador de caixa, **eu quero** selecionar PIX e apresentar um QR Code de pagamento **para que** o cliente possa realizar o pagamento e a venda seja confirmada após a confirmação do pagamento.
 
@@ -296,3 +296,4 @@ Essas relações representam o núcleo do domínio sem definir banco, endpoints 
 | 20/09/2026 | 1.0.0 | Definição inicial do tema Bleep Checkout, escopo funcional, regras de negócio e formas de pagamento. |
 | 08/10/2026 | 1.1.0 | Atores gerente e operador de caixa; US01 e US02 passam ao gerente; CPF único em US02; novas US09–US13 (Draft); RN13–RN18; venda PIX pendente não expira; fora de escopo ampliado. |
 | 07/11/2026 | 1.1.1 | US09 (Entrar no sistema) passa a 🟢 Live, implementada na Issue #10. |
+| 24/11/2026 | 1.1.2 | US06 (Pagar via PIX — integrada ao Mercado Pago Checkout Transparente com Cartão e PIX) passa a 🟢 Live, implementada na Issue #3. |

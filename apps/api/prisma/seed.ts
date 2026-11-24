@@ -40,6 +40,35 @@ async function upsertUser(
   });
 }
 
+// TODO #1: catálogo inicial temporário via seed até existir o cadastro de produtos pela tela do gerente (Issue #1).
+const INITIAL_PRODUCTS = [
+  { name: 'Café Torrado 500g', barcode: '7891000000011', priceCents: 1890 },
+  { name: 'Arroz Tipo 1 5kg', barcode: '7891000000028', priceCents: 2990 },
+  { name: 'Feijão Carioca 1kg', barcode: '7891000000035', priceCents: 890 },
+  { name: 'Leite Integral 1L', barcode: '7891000000042', priceCents: 549 },
+  { name: 'Açúcar Refinado 1kg', barcode: '7891000000059', priceCents: 499 },
+] as const;
+
+async function upsertProduct(
+  prisma: PrismaClient,
+  data: { name: string; barcode: string; priceCents: number },
+) {
+  return prisma.product.upsert({
+    where: { barcode: data.barcode },
+    update: {
+      name: data.name,
+      priceCents: data.priceCents,
+      active: true,
+    },
+    create: {
+      name: data.name,
+      barcode: data.barcode,
+      priceCents: data.priceCents,
+      active: true,
+    },
+  });
+}
+
 async function main() {
   const managerEmail = requireEnv('SEED_MANAGER_EMAIL');
   const managerPassword = requireEnv('SEED_MANAGER_PASSWORD');
@@ -65,6 +94,9 @@ async function main() {
       role: Role.OPERATOR,
       createdById: manager.id,
     });
+    for (const product of INITIAL_PRODUCTS) {
+      await upsertProduct(prisma, product);
+    }
   } finally {
     await prisma.$disconnect();
   }

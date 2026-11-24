@@ -1,0 +1,371 @@
+<main class="min-h-screen bg-fundo p-lg">
+  <div class="mx-auto flex max-w-5xl flex-col gap-lg">
+    <h1 class="text-titulo-pagina text-texto">Caixa</h1>
+
+    @if (!sale()) {
+      <!-- Montagem simplificada de venda (TODO #4: busca por código de barras e pesquisa entram na US03) -->
+      <div class="grid grid-cols-1 gap-lg md:grid-cols-3">
+        <section class="rounded-lg bg-superficie p-lg shadow md:col-span-2">
+          <h2 class="mb-md text-titulo-secao text-texto">Produtos disponíveis</h2>
+
+          @if (loadingProducts()) {
+            <p class="text-corpo text-texto-suave">Carregando produtos...</p>
+          } @else if (productsError(); as message) {
+            <p class="text-corpo text-perigo" role="alert">{{ message }}</p>
+          } @else if (products().length === 0) {
+            <p class="text-corpo text-texto-suave">Nenhum produto ativo disponível.</p>
+          } @else {
+            <ul class="divide-y divide-desabilitado">
+              @for (product of products(); track product.id) {
+                <li class="flex items-center justify-between gap-md py-sm">
+                  <div class="flex flex-col gap-xs">
+                    <span class="text-corpo-destaque text-texto">{{ product.name }}</span>
+                    <span class="text-legenda text-texto-suave">
+                      {{ formatCents(product.priceCents) }}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    [attr.data-testid]="'add-product-' + product.id"
+                    class="rounded-md bg-primaria px-md py-xs text-corpo-destaque text-superficie hover:brightness-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primaria disabled:bg-desabilitado"
+                    [disabled]="creatingSale()"
+                    (click)="addProduct(product)"
+                  >
+                    Adicionar
+                  </button>
+                </li>
+              }
+            </ul>
+          }
+        </section>
+
+        <section class="flex flex-col gap-md rounded-lg bg-superficie p-lg shadow">
+          <h2 class="text-titulo-secao text-texto">Itens da venda</h2>
+
+          @if (cart().length === 0) {
+            <p class="text-corpo text-texto-suave">Adicione produtos para iniciar a venda.</p>
+          } @else {
+            <ul class="divide-y divide-desabilitado">
+              @for (item of cart(); track item.product.id) {
+                <li class="flex items-center justify-between gap-sm py-sm">
+                  <div class="flex flex-col gap-xs">
+                    <span class="text-corpo text-texto">{{ item.product.name }}</span>
+                    <span class="text-legenda text-texto-suave">
+                      {{ item.quantity }}x {{ formatCents(item.product.priceCents) }}
+                    </span>
+                  </div>
+                  <div class="flex items-center gap-xs">
+                    <button
+                      type="button"
+                      class="rounded-md border border-primaria px-sm py-xs text-corpo-destaque text-primaria hover:bg-fundo focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primaria disabled:border-desabilitado disabled:text-desabilitado"
+                      [disabled]="creatingSale()"
+                      (click)="decreaseProduct(item.product.id)"
+                      aria-label="Diminuir quantidade"
+                    >
+                      -
+                    </button>
+                    <button
+                      type="button"
+                      class="rounded-md border border-primaria px-sm py-xs text-corpo-destaque text-primaria hover:bg-fundo focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primaria disabled:border-desabilitado disabled:text-desabilitado"
+                      [disabled]="creatingSale()"
+                      (click)="addProduct(item.product)"
+                      aria-label="Aumentar quantidade"
+                    >
+                      +
+                    </button>
+                  </div>
+                </li>
+              }
+            </ul>
+          }
+
+          <div class="border-t border-desabilitado pt-md">
+            <p class="text-legenda text-texto-suave">Total estimado ({{ cartItemCount() }} itens)</p>
+            <p class="text-valor-destaque text-texto">{{ formatCents(cartTotalCents()) }}</p>
+          </div>
+
+          @if (saleError(); as message) {
+            <p class="text-corpo text-perigo" role="alert">{{ message }}</p>
+          }
+
+          <button
+            type="button"
+            data-testid="proceed-payment"
+            class="w-full rounded-md bg-primaria px-md py-sm text-corpo-destaque text-superficie hover:brightness-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primaria disabled:bg-desabilitado"
+            [disabled]="creatingSale() || cart().length === 0"
+            (click)="proceedToPayment()"
+          >
+            @if (creatingSale()) {
+              Criando venda...
+            } @else {
+              Prosseguir para pagamento
+            }
+          </button>
+        </section>
+      </div>
+    } @else if (sale(); as currentSale) {
+      <section class="flex flex-col gap-md rounded-lg bg-superficie p-lg shadow">
+        <div class="flex flex-wrap items-center justify-between gap-md border-b border-desabilitado pb-md">
+          <div>
+            <h2 class="text-titulo-secao text-texto">Venda #{{ currentSale.number }}</h2>
+            <p class="text-valor-destaque text-texto">{{ formatCents(currentSale.totalCents) }}</p>
+          </div>
+
+          @if (currentSale.status === 'OPEN') {
+            <span
+              data-testid="sale-status-badge"
+              class="inline-flex items-center gap-xs rounded-full border border-primaria px-md py-xs text-legenda font-semibold text-primaria"
+            >
+              <svg
+                aria-hidden="true"
+                class="h-4 w-4 shrink-0"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <circle cx="9" cy="20" r="1" />
+                <circle cx="18" cy="20" r="1" />
+                <path d="M2 3h3l2.4 12.2a2 2 0 0 0 2 1.6h8.2a2 2 0 0 0 2-1.6L21 7H6" />
+              </svg>
+              Venda aberta
+            </span>
+          } @else if (currentSale.status === 'PENDING') {
+            <span
+              data-testid="sale-status-badge"
+              class="inline-flex items-center gap-xs rounded-full border border-alerta px-md py-xs text-legenda font-semibold text-alerta"
+            >
+              <svg
+                aria-hidden="true"
+                class="h-4 w-4 shrink-0"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <circle cx="12" cy="12" r="9" />
+                <path d="M12 7v5l3 2" />
+              </svg>
+              Pendente — aguardando pagamento
+            </span>
+          } @else if (currentSale.status === 'COMPLETED') {
+            <span
+              data-testid="sale-status-badge"
+              class="inline-flex items-center gap-xs rounded-full border border-sucesso px-md py-xs text-legenda font-semibold text-sucesso"
+            >
+              <svg
+                aria-hidden="true"
+                class="h-4 w-4 shrink-0"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M20 6 9 17l-5-5" />
+              </svg>
+              Concluída
+            </span>
+          } @else {
+            <span
+              data-testid="sale-status-badge"
+              class="inline-flex items-center gap-xs rounded-full border border-perigo px-md py-xs text-legenda font-semibold text-perigo"
+            >
+              <svg
+                aria-hidden="true"
+                class="h-4 w-4 shrink-0"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M18 6 6 18" />
+                <path d="m6 6 12 12" />
+              </svg>
+              Cancelada — nenhum valor recebido
+            </span>
+          }
+        </div>
+
+        @if (currentSale.status === 'COMPLETED') {
+          <div class="flex flex-col gap-md rounded-md border border-sucesso p-md">
+            <p class="text-titulo-secao text-sucesso">Venda concluída — pagamento confirmado!</p>
+            <p class="text-corpo text-texto">
+              O pagamento da venda #{{ currentSale.number }} foi confirmado pelo gateway.
+            </p>
+            <div>
+              <button
+                type="button"
+                data-testid="new-sale"
+                class="rounded-md bg-primaria px-md py-sm text-corpo-destaque text-superficie hover:brightness-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primaria"
+                (click)="startNewSale()"
+              >
+                Nova venda
+              </button>
+            </div>
+          </div>
+        } @else if (currentSale.status === 'PENDING') {
+          <div class="flex flex-col gap-md rounded-md border border-alerta p-md">
+            @if (isPixPending()) {
+              <p class="text-titulo-secao text-alerta">Aguardando confirmação do PIX</p>
+              <p class="text-corpo text-texto-suave">
+                Peça ao cliente para escanear o QR Code ou copiar o código abaixo. A venda só será
+                concluída após confirmação do gateway.
+              </p>
+
+              @if (lastPayment(); as payment) {
+                @if (payment.qrCodeBase64) {
+                  <div class="flex justify-center py-sm">
+                    <img
+                      [src]="'data:image/png;base64,' + payment.qrCodeBase64"
+                      alt="QR Code PIX"
+                      class="h-56 w-56 rounded-md border border-desabilitado bg-superficie p-sm"
+                    />
+                  </div>
+                }
+
+                @if (payment.qrCode) {
+                  <div class="flex flex-col gap-xs">
+                    <span class="text-legenda text-texto-suave">Código PIX copia e cola</span>
+                    <code
+                      class="block break-all rounded-md border border-desabilitado bg-fundo p-sm text-legenda text-texto"
+                    >
+                      {{ payment.qrCode }}
+                    </code>
+                    <div>
+                      <button
+                        type="button"
+                        data-testid="copy-pix-code"
+                        class="rounded-md border border-primaria px-md py-xs text-corpo-destaque text-primaria hover:bg-fundo focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primaria"
+                        (click)="copyPixCode(payment.qrCode)"
+                      >
+                        @if (copiedPixCode()) {
+                          Código copiado
+                        } @else {
+                          Copiar código PIX
+                        }
+                      </button>
+                    </div>
+                  </div>
+                }
+              }
+            } @else if (isCardPending()) {
+              <p class="text-titulo-secao text-alerta">Estamos confirmando o pagamento</p>
+              <p class="text-corpo text-texto-suave">
+                Seu pagamento com cartão está em análise pelo gateway. Esta tela atualiza
+                automaticamente assim que houver confirmação.
+              </p>
+            }
+
+            <div>
+              <button
+                type="button"
+                data-testid="new-sale"
+                class="rounded-md border border-primaria px-md py-sm text-corpo-destaque text-primaria hover:bg-fundo focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primaria"
+                (click)="startNewSale()"
+              >
+                Voltar ao caixa
+              </button>
+            </div>
+          </div>
+        } @else if (currentSale.status === 'OPEN') {
+          <div class="flex flex-wrap gap-sm">
+            <button
+              type="button"
+              data-testid="select-method-card"
+              class="rounded-md px-md py-sm text-corpo-destaque focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primaria disabled:bg-desabilitado"
+              [class.bg-primaria]="selectedMethod() === 'CARD'"
+              [class.text-superficie]="selectedMethod() === 'CARD'"
+              [class.hover:brightness-90]="selectedMethod() === 'CARD'"
+              [class.border]="selectedMethod() !== 'CARD'"
+              [class.border-primaria]="selectedMethod() !== 'CARD'"
+              [class.text-primaria]="selectedMethod() !== 'CARD'"
+              [class.hover:bg-fundo]="selectedMethod() !== 'CARD'"
+              [disabled]="submittingPayment()"
+              (click)="selectPaymentMethod('CARD')"
+            >
+              Cartão de crédito
+            </button>
+
+            <button
+              type="button"
+              data-testid="select-method-pix"
+              class="rounded-md px-md py-sm text-corpo-destaque focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primaria disabled:bg-desabilitado"
+              [class.bg-primaria]="selectedMethod() === 'PIX'"
+              [class.text-superficie]="selectedMethod() === 'PIX'"
+              [class.hover:brightness-90]="selectedMethod() === 'PIX'"
+              [class.border]="selectedMethod() !== 'PIX'"
+              [class.border-primaria]="selectedMethod() !== 'PIX'"
+              [class.text-primaria]="selectedMethod() !== 'PIX'"
+              [class.hover:bg-fundo]="selectedMethod() !== 'PIX'"
+              [disabled]="submittingPayment()"
+              (click)="selectPaymentMethod('PIX')"
+            >
+              PIX
+            </button>
+          </div>
+
+          @if (declinedMessage(); as message) {
+            <div class="flex flex-col gap-sm rounded-md border border-perigo p-md" role="alert">
+              <p class="text-corpo-destaque text-perigo">{{ message }}</p>
+              <div>
+                <button
+                  type="button"
+                  data-testid="retry-card"
+                  class="rounded-md border border-primaria px-md py-xs text-corpo-destaque text-primaria hover:bg-fundo focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primaria"
+                  (click)="retryCardPayment()"
+                >
+                  Tentar novamente com cartão
+                </button>
+              </div>
+            </div>
+          }
+
+          @if (paymentError(); as message) {
+            <p class="text-corpo text-perigo" role="alert">{{ message }}</p>
+          }
+
+          @if (selectedMethod() === 'CARD') {
+            <div class="flex flex-col gap-sm">
+              @if (brickLoading()) {
+                <p class="text-corpo text-texto-suave">Carregando formulário de cartão...</p>
+              }
+              @if (submittingPayment()) {
+                <p class="text-corpo text-texto-suave">Processando pagamento...</p>
+              }
+              <div id="card-payment-brick-container"></div>
+            </div>
+          } @else {
+            <div class="flex flex-col gap-md">
+              <p class="text-corpo text-texto-suave">
+                Gere o QR Code PIX para o valor de {{ formatCents(currentSale.totalCents) }}.
+              </p>
+              <div>
+                <button
+                  type="button"
+                  data-testid="generate-pix"
+                  class="rounded-md bg-primaria px-md py-sm text-corpo-destaque text-superficie hover:brightness-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primaria disabled:bg-desabilitado"
+                  [disabled]="submittingPayment()"
+                  (click)="generatePix()"
+                >
+                  @if (submittingPayment()) {
+                    Gerando PIX...
+                  } @else {
+                    Gerar QR Code PIX
+                  }
+                </button>
+              </div>
+            </div>
+          }
+        }
+      </section>
+    }
+  </div>
+</main>
