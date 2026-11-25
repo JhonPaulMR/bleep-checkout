@@ -1,4 +1,4 @@
-import { Controller, Get } from '@nestjs/common';
+import { Body, Controller, Get, Post, Req } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiOperation,
@@ -7,6 +7,8 @@ import {
 } from '@nestjs/swagger';
 import { Role } from '../../../generated/prisma/enums.js';
 import { Roles } from '../../common/decorators/roles.decorator.js';
+import type { JwtPayload } from '../../common/guards/jwt-auth.guard.js';
+import { CreateProductDto } from './dto/create-product.dto.js';
 import { ProductsService } from './products.service.js';
 
 @ApiTags('products')
@@ -15,22 +17,44 @@ import { ProductsService } from './products.service.js';
 export class ProductsController {
   constructor(private readonly products: ProductsService) {}
 
-  // TODO #4: expandir listagem mínima de produtos ativos no caixa com busca e código de barras
-  @Get()
-  @Roles(Role.OPERATOR)
-  @ApiOperation({
-    summary: 'Lista os produtos ativos disponíveis para venda no caixa',
-  })
-  @ApiResponse({ status: 200, description: 'Lista de produtos ativos' })
+  @Post()
+  @Roles(Role.MANAGER)
+  @ApiOperation({ summary: 'Cadastra um novo produto no catálogo' })
+  @ApiResponse({ status: 201, description: 'Produto cadastrado com sucesso' })
+  @ApiResponse({ status: 400, description: 'Corpo da requisição inválido' })
   @ApiResponse({
     status: 401,
     description: 'Sessão ausente, inválida ou expirada',
   })
   @ApiResponse({
     status: 403,
-    description: 'Acesso permitido apenas para operadores de caixa',
+    description: 'Acesso permitido apenas para gerentes',
   })
-  listActive() {
-    return this.products.findActive();
+  @ApiResponse({
+    status: 409,
+    description: 'Já existe um produto com este código de barras.',
+  })
+  create(@Body() body: CreateProductDto) {
+    return this.products.create(body);
+  }
+
+  // TODO #4: expandir listagem mínima de produtos ativos no caixa com busca e código de barras
+  @Get()
+  @Roles(Role.MANAGER, Role.OPERATOR)
+  @ApiOperation({
+    summary:
+      'Lista produtos do catálogo (gerente) ou ativos disponíveis para venda no caixa (operador)',
+  })
+  @ApiResponse({ status: 200, description: 'Lista de produtos' })
+  @ApiResponse({
+    status: 401,
+    description: 'Sessão ausente, inválida ou expirada',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Acesso permitido apenas para gerentes ou operadores de caixa',
+  })
+  list(@Req() request: { user: JwtPayload }) {
+    return this.products.listForRole(request.user.role);
   }
 }

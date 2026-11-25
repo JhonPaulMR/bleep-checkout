@@ -92,3 +92,39 @@ describe('rota /operadores', () => {
     expect(router.url).toBe('/login');
   });
 });
+
+describe('rota /produtos', () => {
+  let auth: AuthService;
+  let router: Router;
+
+  beforeEach(() => {
+    sessionStorage.clear();
+    TestBed.configureTestingModule({
+      providers: [provideRouter(routes), provideHttpClient(), provideHttpClientTesting()],
+    });
+    auth = TestBed.inject(AuthService);
+    router = TestBed.inject(Router);
+  });
+
+  it('OPERATOR navegando para /produtos é redirecionado para /caixa (CA4)', async () => {
+    auth.startSession('t', { name: 'João', role: 'OPERATOR' });
+
+    await router.navigateByUrl('/produtos');
+
+    expect(router.url).toBe('/caixa');
+  });
+
+  it('MANAGER acessa /produtos', async () => {
+    auth.startSession('t', { name: 'Maria', role: 'MANAGER' });
+
+    await router.navigateByUrl('/produtos');
+
+    expect(router.url).toBe('/produtos');
+  });
+
+  it('sem sessão, navegando para /produtos vai para /login', async () => {
+    await router.navigateByUrl('/produtos');
+
+    expect(router.url).toBe('/login');
+  });
+});

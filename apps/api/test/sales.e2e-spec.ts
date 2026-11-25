@@ -132,7 +132,7 @@ describe('Catálogo mínimo e vendas — /products e /sales (e2e)', () => {
       await request(app.getHttpServer()).get('/products').expect(401);
     });
 
-    it('devolve 403 para MANAGER', async () => {
+    it('permite listagem de produtos para MANAGER (US01 CA4)', async () => {
       const managerToken = await login(
         process.env.SEED_MANAGER_EMAIL!,
         process.env.SEED_MANAGER_PASSWORD!,
@@ -141,7 +141,7 @@ describe('Catálogo mínimo e vendas — /products e /sales (e2e)', () => {
       await request(app.getHttpServer())
         .get('/products')
         .set('Authorization', `Bearer ${managerToken}`)
-        .expect(403);
+        .expect(200);
     });
   });
 

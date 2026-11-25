@@ -1,10 +1,177 @@
-import { Component } from '@angular/core';
+import { HttpErrorResponse } from '@angular/common/http';
+import { Component, computed, inject, OnInit, signal } from '@angular/core';
+import { FormsModule } from '@angular/forms';
+import { Product, ProductsService } from '../data/products.service';
 
-// TODO #1: área de Cadastros vazia; as funções do gerente nascem na US01 (Cadastrar produto).
+const BRL_FORMATTER = new Intl.NumberFormat('pt-BR', {
+  style: 'currency',
+  currency: 'BRL',
+});
+
+const EAN13_FORMAT = /^\d{13}$/;
+const NUMERIC_PRICE_FORMAT = /^-?\d+(?:[.,]\d+)?$/;
+
+function parsePriceToCents(raw: string): number | null {
+  const trimmed = raw.trim();
+  if (!NUMERIC_PRICE_FORMAT.test(trimmed)) return null;
+  const numeric = Number(trimmed.replace(',', '.'));
+  if (!Number.isFinite(numeric)) return null;
+  return Math.round(numeric * 100);
+}
+
 @Component({
   selector: 'app-products-page',
-  template: `<main class="p-md">
-    <h1 class="text-titulo-pagina text-texto">Cadastros</h1>
-  </main>`,
+  imports: [FormsModule],
+  templateUrl: './products.page.html',
 })
-export class ProductsPage {}
+export class ProductsPage implements OnInit {
+  private readonly productsService = inject(ProductsService);
+
+  protected readonly products = signal<Product[]>([]);
+  protected readonly loading = signal(true);
+  protected readonly listError = signal<string | null>(null);
+  protected readonly searchTerm = signal('');
+
+  protected readonly modalOpen = signal(false);
+  protected readonly name = signal('');
+  protected readonly barcode = signal('');
+  protected readonly price = signal('');
+  protected readonly submitted = signal(false);
+  protected readonly saving = signal(false);
+  protected readonly submitError = signal<string | null>(null);
+  protected readonly barcodeConflictError = signal<string | null>(null);
+
+  protected readonly nameError = computed(() =>
+    this.name().trim() === '' ? 'Informe o nome do produto.' : null,
+  );
+
+  protected readonly barcodeValid = computed(() => EAN13_FORMAT.test(this.barcode().trim()));
+
+  protected readonly barcodeError = computed(() => {
+    const trimmed = this.barcode().trim();
+    if (trimmed === '') return 'Informe o código de barras.';
+    return EAN13_FORMAT.test(trimmed)
+      ? null
+      : 'O código de barras deve conter exatamente 13 dígitos numéricos.';
+  });
+
+  protected readonly priceError = computed(() => {
+    const trimmed = this.price().trim();
+    if (trimmed === '') return 'Informe o preço unitário.';
+    const cents = parsePriceToCents(trimmed);
+    return cents !== null && cents > 0 ? null : 'Informe um preço unitário maior que zero.';
+  });
+
+  protected readonly activeProductsCount = computed(
+    () => this.products().filter((product) => product.active).length,
+  );
+
+  protected readonly filteredProducts = computed(() => {
+    const term = this.searchTerm().trim().toLowerCase();
+    if (!term) return this.products();
+
+    return this.products().filter(
+      (product) =>
+        product.name.toLowerCase().includes(term) || product.barcode.toLowerCase().includes(term),
+    );
+  });
+
+  // TODO #14: edição e desativação de produtos entram na US13
+  protected readonly actionsDisabled = true;
+
+  ngOnInit(): void {
+    this.listError.set(null);
+    this.productsService.list().subscribe({
+      next: (products) => {
+        this.products.set(products);
+        this.listError.set(null);
+        this.loading.set(false);
+      },
+      error: (err: unknown) => {
+        this.loading.set(false);
+        if (err instanceof HttpErrorResponse && err.status === 401) return;
+        this.listError.set('Não foi possível conectar. Tente novamente.');
+      },
+    });
+  }
+
+  protected formatPrice(priceCents: number): string {
+    return BRL_FORMATTER.format(priceCents / 100);
+  }
+
+  protected openModal(): void {
+    this.resetForm();
+    this.modalOpen.set(true);
+  }
+
+  protected closeModal(): void {
+    this.resetForm();
+    this.modalOpen.set(false);
+  }
+
+  protected onBarcodeChange(value: string): void {
+    this.barcode.set(value);
+    if (this.barcodeConflictError()) {
+      this.barcodeConflictError.set(null);
+    }
+  }
+
+  protected submit(): void {
+    if (this.saving()) return;
+    this.submitted.set(true);
+
+    if (this.nameError() || this.barcodeError() || this.priceError()) return;
+
+    const priceCents = parsePriceToCents(this.price());
+    if (priceCents === null || priceCents <= 0) return;
+
+    this.submitError.set(null);
+    this.barcodeConflictError.set(null);
+    this.saving.set(true);
+
+    this.productsService
+      .create({
+        name: this.name().trim(),
+        barcode: this.barcode().trim(),
+        priceCents,
+      })
+      .subscribe({
+        next: (created) => {
+          this.products.update((current) =>
+            [...current, created].sort((a, b) => a.name.localeCompare(b.name)),
+          );
+          this.saving.set(false);
+          this.closeModal();
+        },
+        error: (err: unknown) => {
+          this.saving.set(false);
+          if (err instanceof HttpErrorResponse) {
+            if (err.status === 401) {
+              return;
+            }
+            if (err.status === 409) {
+              const apiMessage = (err.error as { message?: unknown } | null)?.message;
+              this.barcodeConflictError.set(
+                typeof apiMessage === 'string'
+                  ? apiMessage
+                  : 'Já existe um produto com este código de barras.',
+              );
+              this.submitError.set(null);
+              return;
+            }
+          }
+          this.submitError.set('Não foi possível conectar. Tente novamente.');
+        },
+      });
+  }
+
+  private resetForm(): void {
+    this.name.set('');
+    this.barcode.set('');
+    this.price.set('');
+    this.submitted.set(false);
+    this.saving.set(false);
+    this.submitError.set(null);
+    this.barcodeConflictError.set(null);
+  }
+}
