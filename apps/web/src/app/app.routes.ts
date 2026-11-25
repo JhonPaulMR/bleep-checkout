@@ -8,6 +8,11 @@ export const routes: Routes = [
   },
   {
     path: 'cadastros',
+    redirectTo: 'produtos',
+    pathMatch: 'full',
+  },
+  {
+    path: 'produtos',
     canMatch: [roleGuard('MANAGER')],
     loadComponent: () =>
       import('./features/products/pages/products.page').then((m) => m.ProductsPage),

@@ -1,12 +1,15 @@
 import { TestBed } from '@angular/core/testing';
-import { provideRouter } from '@angular/router';
+import { provideRouter, Router } from '@angular/router';
 import { AuthService } from '../auth/auth.service';
 import { Header } from './header';
 
 describe('Header', () => {
+  let router: Router;
+
   beforeEach(() => {
     sessionStorage.clear();
     TestBed.configureTestingModule({ imports: [Header], providers: [provideRouter([])] });
+    router = TestBed.inject(Router);
   });
 
   async function render() {
@@ -15,7 +18,7 @@ describe('Header', () => {
     return fixture.nativeElement as HTMLElement;
   }
 
-  it('gerente vê Cadastros e Operadores com seus respectivos caminhos', async () => {
+  it('gerente vê Produtos e Operadores com seus respectivos caminhos', async () => {
     TestBed.inject(AuthService).startSession('t', { name: 'Maria', role: 'MANAGER' });
     const el = await render();
 
@@ -24,12 +27,12 @@ describe('Header', () => {
       href: a.getAttribute('href'),
     }));
     expect(links).toEqual([
-      { label: 'Cadastros', href: '/cadastros' },
+      { label: 'Produtos', href: '/produtos' },
       { label: 'Operadores', href: '/operadores' },
     ]);
   });
 
-  it('operador vê só Caixa e não vê Operadores (CA4)', async () => {
+  it('operador vê só Caixa e não vê Produtos (CA4)', async () => {
     TestBed.inject(AuthService).startSession('t', { name: 'João', role: 'OPERATOR' });
     const el = await render();
 
@@ -40,9 +43,46 @@ describe('Header', () => {
     expect(links).toEqual([{ label: 'Caixa', href: '/caixa' }]);
   });
 
+  it('exibe nome do usuário e papel em português para gerente', async () => {
+    TestBed.inject(AuthService).startSession('t', { name: 'Maria Silva', role: 'MANAGER' });
+    const el = await render();
+
+    expect(el.textContent).toContain('Maria Silva');
+    expect(el.textContent).toContain('Gerente');
+  });
+
+  it('exibe nome do usuário e papel em português para operador', async () => {
+    TestBed.inject(AuthService).startSession('t', { name: 'João Souza', role: 'OPERATOR' });
+    const el = await render();
+
+    expect(el.textContent).toContain('João Souza');
+    expect(el.textContent).toContain('Operador de caixa');
+  });
+
+  it('botão Sair encerra a sessão e redireciona para /login', async () => {
+    const auth = TestBed.inject(AuthService);
+    auth.startSession('t', { name: 'Maria', role: 'MANAGER' });
+    const navigateSpy = vi.spyOn(router, 'navigateByUrl').mockResolvedValue(true);
+    const clearSessionSpy = vi.spyOn(auth, 'clearSession');
+
+    const fixture = TestBed.createComponent(Header);
+    await fixture.whenStable();
+    const el = fixture.nativeElement as HTMLElement;
+
+    const logoutBtn = Array.from(el.querySelectorAll('button')).find(
+      (b) => b.textContent?.trim() === 'Sair',
+    );
+    expect(logoutBtn).toBeDefined();
+    logoutBtn?.click();
+
+    expect(clearSessionSpy).toHaveBeenCalled();
+    expect(navigateSpy).toHaveBeenCalledWith('/login');
+  });
+
   it('sem sessão, não mostra menu', async () => {
     const el = await render();
 
     expect(el.querySelectorAll('nav a').length).toBe(0);
+    expect(el.querySelector('header')).toBeNull();
   });
 });
