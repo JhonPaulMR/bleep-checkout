@@ -262,13 +262,23 @@
               data-testid="input-customer-cpf"
               placeholder="000.000.000-00"
               [ngModel]="cpf()"
-              (ngModelChange)="cpf.set($event)"
-              class="rounded-xl border px-md py-sm font-mono text-corpo text-texto placeholder:text-texto-suave focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primaria"
-              [class.border-perigo]="submitted() && cpfError()"
-              [class.border-desabilitado]="!(submitted() && cpfError())"
+              (ngModelChange)="onCpfChange($event)"
+              class="rounded-xl px-md py-sm font-mono text-corpo text-texto placeholder:text-texto-suave focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primaria"
+              [class.border]="!cpfHasError()"
+              [class.border-2]="cpfHasError()"
+              [class.border-perigo]="cpfHasError()"
+              [class.border-desabilitado]="!cpfHasError()"
             />
-            @if (submitted() && cpfError(); as message) {
-              <p class="text-legenda text-perigo" role="alert">{{ message }}</p>
+            @if (cpfConflictError(); as message) {
+              <p class="inline-flex items-center gap-xs text-legenda text-perigo" role="alert">
+                <span class="material-symbols-outlined text-[16px]" aria-hidden="true">error</span>
+                <span>{{ message }}</span>
+              </p>
+            } @else if (submitted() && cpfError(); as message) {
+              <p class="inline-flex items-center gap-xs text-legenda text-perigo" role="alert">
+                <span class="material-symbols-outlined text-[16px]" aria-hidden="true">error</span>
+                <span>{{ message }}</span>
+              </p>
             }
           </div>
 

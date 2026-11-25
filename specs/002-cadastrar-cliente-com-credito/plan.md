@@ -38,7 +38,7 @@
   - Teste primeiro: testes unitários em `customers.page.spec.ts` verificando abertura e cancelamento do modal sem chamar `CustomersService.create`, validação inline bloqueando nome vazio, CPF inválido e saldo negativo/inválido (mas aceitando `0,00`), e envio válido normalizando CPF para 11 dígitos e convertendo saldo para `balanceCents`, atualizando lista/cards e fechando o modal; falham porque o modal ainda não existe
   - Arquivos previstos: `apps/web/src/app/features/customers/pages/customers.page.ts`, `apps/web/src/app/features/customers/pages/customers.page.html`, `apps/web/src/app/features/customers/pages/customers.page.spec.ts`
 
-- [ ] **Tarefa 5 — Tratar conflito `409` (CPF duplicado), sessão expirada `401` e falha de rede no modal de Clientes**
+- [x] **Tarefa 5 — Tratar conflito `409` (CPF duplicado), sessão expirada `401` e falha de rede no modal de Clientes**
   - Cobre: CA2 (lado do front), CA8, CA9 (cadastro)
   - Teste primeiro: testes unitários em `customers.page.spec.ts` verificando que `409` destaca o campo CPF em `perigo` com `"Já existe um cliente com este CPF."` mantendo campos preenchidos e limpando o erro ao editar CPF, falha de rede exibe `"Não foi possível conectar. Tente novamente."` mantendo campos e saindo do carregamento, e teste integrado com `authInterceptor` + `HttpTestingController` provando que `401` limpa a sessão, redireciona para `/login` com aviso de sessão expirada e não adiciona cliente; falham porque esses tratamentos ainda não existem
   - Arquivos previstos: `apps/web/src/app/features/customers/pages/customers.page.ts`, `apps/web/src/app/features/customers/pages/customers.page.html`, `apps/web/src/app/features/customers/pages/customers.page.spec.ts`

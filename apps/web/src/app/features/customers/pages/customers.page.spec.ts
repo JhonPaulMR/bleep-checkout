@@ -1,6 +1,12 @@
-import { HttpErrorResponse } from '@angular/common/http';
+import { HttpErrorResponse, provideHttpClient, withInterceptors } from '@angular/common/http';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
+import { provideRouter, Router } from '@angular/router';
 import { Observable, of, Subject, throwError } from 'rxjs';
+import { authInterceptor } from '../../../core/auth/auth.interceptor';
+import { AuthService } from '../../../core/auth/auth.service';
+import { IdleSessionService } from '../../../core/auth/idle-session.service';
+import { API_URL } from '../../../core/config/api-url';
 import { CreateCustomerPayload, Customer, CustomersService } from '../data/customers.service';
 import { CustomersPage } from './customers.page';
 
@@ -404,8 +410,8 @@ describe('CustomersPage', () => {
     expect(rows[1].textContent).toContain('Maria Silva');
   });
 
-  it('aceita saldo inicial 0,00 e exibe erro genérico quando create falha', async () => {
-    const fixture = setup([], () => throwError(() => new Error('Unexpected failure')));
+  it('aceita saldo inicial 0,00 no envio com sucesso', async () => {
+    const fixture = setup([]);
     await fixture.whenStable();
     const el = fixture.nativeElement as HTMLElement;
 
@@ -430,8 +436,182 @@ describe('CustomersPage', () => {
       cpf: '33344455566',
       balanceCents: 0,
     });
+    expect(el.querySelector('[data-testid="customer-modal"]')).toBeNull();
+  });
+
+  it('409 no cadastro exibe mensagem de CPF duplicado com ícone de erro, borda de perigo e mantém campos preenchidos', async () => {
+    const fixture = setup([mariaCustomer]);
+    createSpy.mockReturnValue(
+      throwError(
+        () =>
+          new HttpErrorResponse({
+            status: 409,
+            statusText: 'Conflict',
+            error: { message: 'Já existe um cliente com este CPF.' },
+          }),
+      ),
+    );
+    await fixture.whenStable();
+    const el = fixture.nativeElement as HTMLElement;
+
+    el.querySelector<HTMLButtonElement>('[data-testid="open-new-customer-modal"]')!.click();
+    await fixture.whenStable();
+
+    const nameInput = el.querySelector<HTMLInputElement>('[data-testid="input-customer-name"]')!;
+    const cpfInput = el.querySelector<HTMLInputElement>('[data-testid="input-customer-cpf"]')!;
+    const balanceInput = el.querySelector<HTMLInputElement>(
+      '[data-testid="input-customer-balance"]',
+    )!;
+    const submitButton = el.querySelector<HTMLButtonElement>('[data-testid="submit-customer"]')!;
+    const form = el.querySelector<HTMLFormElement>('[data-testid="customer-modal"] form')!;
+
+    nameInput.value = 'Maria Duplicada';
+    nameInput.dispatchEvent(new Event('input'));
+    cpfInput.value = '12345678901';
+    cpfInput.dispatchEvent(new Event('input'));
+    balanceInput.value = '50,00';
+    balanceInput.dispatchEvent(new Event('input'));
+    await fixture.whenStable();
+
+    form.dispatchEvent(new Event('submit'));
+    await fixture.whenStable();
+
+    expect(submitButton.disabled).toBe(false);
+    expect(submitButton.textContent).toContain('Salvar');
     expect(el.querySelector('[data-testid="customer-modal"]')).not.toBeNull();
-    expect(el.querySelector('[data-testid="submit-customer"]')?.textContent).toContain('Salvar');
-    expect(el.textContent).toContain('Não foi possível cadastrar o cliente. Tente novamente.');
+
+    // Mensagem de conflito 409 com ícone de erro e alert
+    expect(el.textContent).toContain('Já existe um cliente com este CPF.');
+    const alert = el.querySelector('[role="alert"]');
+    expect(alert).not.toBeNull();
+    expect(alert?.textContent).toContain('Já existe um cliente com este CPF.');
+    expect(alert?.textContent).toContain('error');
+
+    // Borda de erro no input de CPF
+    expect(cpfInput.classList.contains('border-perigo')).toBe(true);
+    expect(cpfInput.classList.contains('border-2')).toBe(true);
+
+    // Campos mantidos preenchidos para correção
+    expect(nameInput.value).toBe('Maria Duplicada');
+    expect(cpfInput.value).toBe('12345678901');
+    expect(balanceInput.value).toBe('50,00');
+
+    // Alterar o campo CPF limpa o erro de conflito
+    cpfInput.value = '12345678902';
+    cpfInput.dispatchEvent(new Event('input'));
+    await fixture.whenStable();
+
+    expect(el.textContent).not.toContain('Já existe um cliente com este CPF.');
+    expect(cpfInput.classList.contains('border-perigo')).toBe(false);
+  });
+
+  it('falha de rede no cadastro exibe mensagem de conexão, mantém campos preenchidos e retira botão do carregamento', async () => {
+    const fixture = setup([], () =>
+      throwError(() => new HttpErrorResponse({ status: 0, statusText: 'Unknown Error' })),
+    );
+    await fixture.whenStable();
+    const el = fixture.nativeElement as HTMLElement;
+
+    el.querySelector<HTMLButtonElement>('[data-testid="open-new-customer-modal"]')!.click();
+    await fixture.whenStable();
+
+    const nameInput = el.querySelector<HTMLInputElement>('[data-testid="input-customer-name"]')!;
+    const cpfInput = el.querySelector<HTMLInputElement>('[data-testid="input-customer-cpf"]')!;
+    const balanceInput = el.querySelector<HTMLInputElement>(
+      '[data-testid="input-customer-balance"]',
+    )!;
+    const submitButton = el.querySelector<HTMLButtonElement>('[data-testid="submit-customer"]')!;
+    const form = el.querySelector<HTMLFormElement>('[data-testid="customer-modal"] form')!;
+
+    nameInput.value = 'Carlos Falha';
+    nameInput.dispatchEvent(new Event('input'));
+    cpfInput.value = '55566677788';
+    cpfInput.dispatchEvent(new Event('input'));
+    balanceInput.value = '25,00';
+    balanceInput.dispatchEvent(new Event('input'));
+    await fixture.whenStable();
+
+    form.dispatchEvent(new Event('submit'));
+    await fixture.whenStable();
+
+    expect(el.querySelector('[data-testid="customer-modal"]')).not.toBeNull();
+    expect(submitButton.disabled).toBe(false);
+    expect(submitButton.textContent).toContain('Salvar');
+    expect(el.textContent).toContain('Não foi possível conectar. Tente novamente.');
+    expect(el.querySelector('[role="alert"]')?.textContent).toContain(
+      'Não foi possível conectar. Tente novamente.',
+    );
+    expect(nameInput.value).toBe('Carlos Falha');
+    expect(cpfInput.value).toBe('55566677788');
+    expect(balanceInput.value).toBe('25,00');
+  });
+
+  it('401 no envio do cadastro dispara authInterceptor, limpa sessão, leva ao login com aviso e não adiciona cliente', async () => {
+    sessionStorage.clear();
+    TestBed.configureTestingModule({
+      imports: [CustomersPage],
+      providers: [
+        provideRouter([]),
+        provideHttpClient(withInterceptors([authInterceptor])),
+        provideHttpClientTesting(),
+      ],
+    });
+
+    const controller = TestBed.inject(HttpTestingController);
+    const auth = TestBed.inject(AuthService);
+    const idle = TestBed.inject(IdleSessionService);
+    const apiUrl = TestBed.inject(API_URL);
+    const navigate = vi.spyOn(TestBed.inject(Router), 'navigateByUrl').mockResolvedValue(true);
+
+    auth.startSession('expired-token', { name: 'Gerente', role: 'MANAGER' });
+
+    const fixture = TestBed.createComponent(CustomersPage);
+    fixture.detectChanges();
+
+    const listReq = controller.expectOne(`${apiUrl}/customers`);
+    expect(listReq.request.method).toBe('GET');
+    listReq.flush({ data: [mariaCustomer] });
+    await fixture.whenStable();
+
+    const el = fixture.nativeElement as HTMLElement;
+    el.querySelector<HTMLButtonElement>('[data-testid="open-new-customer-modal"]')!.click();
+    await fixture.whenStable();
+
+    const nameInput = el.querySelector<HTMLInputElement>('[data-testid="input-customer-name"]')!;
+    const cpfInput = el.querySelector<HTMLInputElement>('[data-testid="input-customer-cpf"]')!;
+    const balanceInput = el.querySelector<HTMLInputElement>(
+      '[data-testid="input-customer-balance"]',
+    )!;
+    const form = el.querySelector<HTMLFormElement>('[data-testid="customer-modal"] form')!;
+
+    nameInput.value = 'Cliente Expirado';
+    nameInput.dispatchEvent(new Event('input'));
+    cpfInput.value = '44455566677';
+    cpfInput.dispatchEvent(new Event('input'));
+    balanceInput.value = '10,00';
+    balanceInput.dispatchEvent(new Event('input'));
+    await fixture.whenStable();
+
+    form.dispatchEvent(new Event('submit'));
+
+    const createReq = controller.expectOne(`${apiUrl}/customers`);
+    expect(createReq.request.method).toBe('POST');
+    createReq.flush(
+      { statusCode: 401, message: 'Unauthorized' },
+      { status: 401, statusText: 'Unauthorized' },
+    );
+    await fixture.whenStable();
+
+    expect(auth.isAuthenticated()).toBe(false);
+    expect(idle.expired()).toBe(true);
+    expect(navigate).toHaveBeenCalledWith('/login');
+    expect(el.textContent).not.toContain('Cliente Expirado');
+    expect(el.textContent).not.toContain('Não foi possível conectar. Tente novamente.');
+    expect(el.querySelector<HTMLButtonElement>('[data-testid="submit-customer"]')?.disabled).toBe(
+      false,
+    );
+
+    controller.verify();
+    sessionStorage.clear();
   });
 });

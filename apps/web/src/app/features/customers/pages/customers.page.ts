@@ -11,6 +11,7 @@ const BRL_FORMATTER = new Intl.NumberFormat('pt-BR', {
 const CPF_ALLOWED_CHARS = /^[\d.-]+$/;
 const CPF_DIGITS_FORMAT = /^\d{11}$/;
 const NUMERIC_BALANCE_FORMAT = /^-?\d+(?:[.,]\d{1,2})?$/;
+const CONNECTION_ERROR_MESSAGE = 'Não foi possível conectar. Tente novamente.';
 
 function normalizeCpf(raw: string): string | null {
   const trimmed = raw.trim();
@@ -47,6 +48,7 @@ export class CustomersPage implements OnInit {
   protected readonly submitted = signal(false);
   protected readonly saving = signal(false);
   protected readonly submitError = signal<string | null>(null);
+  protected readonly cpfConflictError = signal<string | null>(null);
 
   protected readonly nameError = computed(() =>
     this.name().trim() === '' ? 'Informe o nome do cliente.' : null,
@@ -57,6 +59,10 @@ export class CustomersPage implements OnInit {
     if (trimmed === '') return 'Informe o CPF.';
     return normalizeCpf(trimmed) ? null : 'Informe um CPF válido com 11 dígitos numéricos.';
   });
+
+  protected readonly cpfHasError = computed(() =>
+    Boolean(this.cpfConflictError() || (this.submitted() && this.cpfError())),
+  );
 
   protected readonly balanceError = computed(() => {
     const trimmed = this.initialBalance().trim();
@@ -105,7 +111,7 @@ export class CustomersPage implements OnInit {
       error: (err: unknown) => {
         this.loading.set(false);
         if (err instanceof HttpErrorResponse && err.status === 401) return;
-        this.listError.set('Não foi possível conectar. Tente novamente.');
+        this.listError.set(CONNECTION_ERROR_MESSAGE);
       },
     });
   }
@@ -138,6 +144,13 @@ export class CustomersPage implements OnInit {
     this.modalOpen.set(false);
   }
 
+  protected onCpfChange(value: string): void {
+    this.cpf.set(value);
+    if (this.cpfConflictError()) {
+      this.cpfConflictError.set(null);
+    }
+  }
+
   protected submit(): void {
     if (this.saving()) return;
     this.submitted.set(true);
@@ -149,6 +162,7 @@ export class CustomersPage implements OnInit {
     if (normalizedCpf === null || balanceCents === null || balanceCents < 0) return;
 
     this.submitError.set(null);
+    this.cpfConflictError.set(null);
     this.saving.set(true);
 
     this.customersService
@@ -165,9 +179,24 @@ export class CustomersPage implements OnInit {
           this.saving.set(false);
           this.closeModal();
         },
-        error: () => {
+        error: (err: unknown) => {
           this.saving.set(false);
-          this.submitError.set('Não foi possível cadastrar o cliente. Tente novamente.');
+          if (err instanceof HttpErrorResponse) {
+            if (err.status === 401) {
+              return;
+            }
+            if (err.status === 409) {
+              const apiMessage = (err.error as { message?: unknown } | null)?.message;
+              this.cpfConflictError.set(
+                typeof apiMessage === 'string'
+                  ? apiMessage
+                  : 'Já existe um cliente com este CPF.',
+              );
+              this.submitError.set(null);
+              return;
+            }
+          }
+          this.submitError.set(CONNECTION_ERROR_MESSAGE);
         },
       });
   }
@@ -179,5 +208,6 @@ export class CustomersPage implements OnInit {
     this.submitted.set(false);
     this.saving.set(false);
     this.submitError.set(null);
+    this.cpfConflictError.set(null);
   }
 }
