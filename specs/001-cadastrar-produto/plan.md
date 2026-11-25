@@ -15,7 +15,7 @@
 
 ## Tarefas
 
-- [ ] **Tarefa 1 — Implementar `POST /products` e liberar `GET /products` para gerente na API (unit + e2e)**
+- [x] **Tarefa 1 — Implementar `POST /products` e liberar `GET /products` para gerente na API (unit + e2e)**
   - Cobre: CA1 (lado da API), CA2 (lado da API), CA3 (lado da API), CA4 (lado da API), CA5
   - Teste primeiro: testes unitários em `products.service.spec.ts` (criação com `active: true` e `trim()` no nome; conflito `409` com mensagem exata em código duplicado; listagem de ativos para operador e catálogo para gerente) e testes e2e em `apps/api/test/products.e2e-spec.ts` (`POST /products` retorna `201` para `MANAGER` e produto aparece em `GET /products` do `OPERATOR`; `409` em código duplicado; `400` para nome vazio, barcode fora de 13 dígitos, `priceCents <= 0` ou campo extra `active`; `403` para `OPERATOR` em `POST /products`; `401` sem token/token inválido em `POST` e `GET`; `200` em `GET /products` para `MANAGER` e `OPERATOR`); falham porque DTO, método `create` e rotas ainda não existem
   - Arquivos previstos: `apps/api/src/modules/products/dto/create-product.dto.ts`, `apps/api/src/modules/products/products.service.ts`, `apps/api/src/modules/products/products.service.spec.ts`, `apps/api/src/modules/products/products.controller.ts`, `apps/api/test/products.e2e-spec.ts`
