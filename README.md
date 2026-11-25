@@ -29,7 +29,11 @@ O Bleep Checkout resolve a necessidade de registrar produtos e clientes, montar 
 
 ## Em produção
 
-A partir da Entrega 3.
+- **Frontend:** https://bleep-checkout-web.onrender.com
+- **API:** https://bleep-checkout.onrender.com
+- **Swagger (documentação da API):** https://bleep-checkout.onrender.com/docs
+
+> O plano gratuito do Render hiberna a API após ~15 minutos sem acesso; a primeira requisição após a hibernação pode levar cerca de 1 minuto para acordar o serviço.
 
 ## Quick Start
 

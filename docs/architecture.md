@@ -1,8 +1,8 @@
 # 🛠️ Architecture / Software Design Document
 
 **Projeto:** Bleep Checkout
-**Versão:** 1.0.2 · decisões da Atividade 07 + ratificação do `/utf-setup` + fechamento da Atividade 08
-**Última atualização:** 25/10/2026
+**Versão:** 1.0.5 · fechamento da Atividade 15 (deploy em produção)
+**Última atualização:** 25/11/2026
 
 > 🤖 **O `prd.md` responde _o quê_ o produto faz. Este responde _onde as coisas
 > moram e como se chamam_.** Detalhe de tela — rota, componente, contrato —
@@ -76,9 +76,9 @@
 | **ID8 · Dados** | Acesso ao banco **só** via `PrismaService`. Operação que altera saldo, venda e pagamento juntos roda em `prisma.$transaction`. O débito de crédito é um update condicional (saldo ≥ total) para não deixar saldo negativo nem sob concorrência. Dinheiro em **centavos inteiros** (`Int`). |
 | **ID9 · Autenticação** | `@nestjs/jwt`. `JwtAuthGuard` **global**, liberado com `@Public()` só no login e no webhook. `RolesGuard` **global** (registrado depois de `JwtAuthGuard`) com `@Roles('MANAGER' \| 'OPERATOR')` e comparação estrita (`required.some(r => r === user.role)`): `MANAGER` não opera o caixa e `OPERATOR` não acessa cadastros (RN13). Token JWT com validade de **12 horas** (somado ao timeout de 30 minutos por inatividade no front). Senha com `argon2`; o hash nunca sai na resposta. |
 | **ID10 · Resposta e erro** | `ResponseInterceptor` global: sucesso sai como `{ data }`. `HttpExceptionFilter` global: erro sai como `{ statusCode, error, message, path, timestamp }`. Erros de domínio têm classe própria e viram **409** (conflito, ex.: código ou CPF duplicado) ou **422** (regra violada, ex.: saldo insuficiente). |
-| **ID17 · Segredos** | `ConfigModule` com validação das variáveis no boot (a API não sobe sem elas): `DATABASE_URL`, `DIRECT_URL`, `JWT_SECRET`, `MP_ACCESS_TOKEN`, `MP_PUBLIC_KEY`, `MP_WEBHOOK_SECRET`, `WEB_ORIGIN`. Só o `.env.example` vai para o repositório; o `.env` fica no `.gitignore`; os valores de produção ficam nas variáveis do Render e da Vercel. |
+| **ID17 · Segredos** | `ConfigModule` com validação das variáveis no boot (a API não sobe sem elas): `DATABASE_URL`, `DIRECT_URL`, `JWT_SECRET`, `MP_ACCESS_TOKEN`, `MP_PUBLIC_KEY`, `MP_WEBHOOK_SECRET`, `WEB_ORIGIN`. Só o `.env.example` vai para o repositório; o `.env` fica no `.gitignore`; os valores de produção ficam nas variáveis de ambiente do Render. |
 | **ID18 · CI** | GitHub Actions em todo PR para a `main`: lint + teste dos dois apps + e2e da API com Postgres como *service* do job, além do check `explicacao`. |
-| **ID19 · Deploy** | API no **Render** (Web Service). Banco no **Neon** com pooling: a `DATABASE_URL` (host `-pooler`) vai para o adapter em runtime; a `DIRECT_URL` (sem pooler) vai para o `prisma.config.ts` e é usada pelo `prisma migrate deploy`. Front na **Vercel**, com rewrite de SPA para `index.html`. CORS liberado só para `WEB_ORIGIN`. |
+| **ID19 · Deploy** | API no **Render** (Web Service). Banco no **Neon** (região São Paulo) com pooling: a `DATABASE_URL` (host `-pooler`) vai para o adapter em runtime; a `DIRECT_URL` (sem pooler) vai para o `prisma.config.ts` e é usada pelo `prisma migrate deploy`. Front no **Render** (Static Site), com rewrite de SPA (`/*` → `/index.html`). CORS liberado só para `WEB_ORIGIN`. |
 | **ID20 · Gateway** | **Mercado Pago em sandbox (Checkout Transparente)**, atrás da interface `PaymentGateway` (implementação real `MercadoPagoGateway` no módulo `payments`, dublê nos testes; o TDD não depende de rede). Cartão (Card Payment Brick) e PIX nascem **no servidor**: um `Payment` ligado à `Sale`, com valor calculado a partir do banco (`Product.priceCents`), `external_reference = sale.id`, `idempotencyKey = payment.id`, `gatewayPaymentId` e QR Code (no PIX) devolvidos pelo gateway. |
 | **ID21 · Webhook** | `POST /webhooks/mercadopago` (`@Public()`), nesta ordem: (1) valida o `x-signature` (HMAC-SHA256 com `MP_WEBHOOK_SECRET` e comparação em tempo constante `crypto.timingSafeEqual`) e recusa com `401` o que não bater; (2) ignora eventos que não sejam `type=payment`; (3) **consulta o pagamento no gateway** (`PaymentGateway.getPayment`), sem confiar só no corpo da notificação (404 encerra em `200`; falhas transitórias relançam erro para retry); (4) dentro de `prisma.$transaction`, grava `WebhookEvent` (`UNIQUE` em `gatewayEventId`), confere `external_reference` e valor, e aplica apenas transições permitidas pela máquina de estados com `updateMany` condicional em `Payment` e `Sale`. |
 
@@ -265,7 +265,7 @@ erDiagram
 | :--- | :--- | :--- |
 | **Local** | PostgreSQL em Docker na máquina (`docker compose up -d`) — nasce na Atividade 08 | `DATABASE_URL` e `DIRECT_URL` no `.env`, fora do Git, as duas apontando para `localhost` |
 | **CI** | PostgreSQL em container, como *service* do job do GitHub Actions | `DATABASE_URL` e `DIRECT_URL` definidas pelo próprio workflow, só para o banco descartável do job |
-| **Produção** | Neon.tech, região São Paulo — nasce no deploy | `DATABASE_URL` (host `-pooler`, runtime via adapter) e `DIRECT_URL` (host direto, migrations) nos secrets do Render |
+| **Produção** | Neon.tech, região AWS South America East 1 (São Paulo), com connection pooling | `DATABASE_URL` (host `-pooler`, runtime via `@prisma/adapter-pg`) e `DIRECT_URL` (host direto, migrations via `prisma.config.ts` e `prisma migrate deploy`) armazenadas nos secrets do Render |
 
 > 🔒 Credenciais **nunca** aparecem no repositório — nem em código, nem em
 > YAML, nem em doc. Só nos *secrets* da plataforma.
@@ -331,6 +331,7 @@ stateDiagram-v2
 | 25/10/2026 | 1.0.2 | Fechamento da Atividade 08: adoção de **npm workspaces** (revoga o "sem workspaces" da 1.0.0, exigido pelo `npm install` único e pelo `npm ci` do CI), ESM ratificado, Prisma 7 + `@nestjs/config` instalados sem nenhum `model`, `.env.example` com `DATABASE_URL` e `DIRECT_URL` |
 | 21/11/2026 | 1.0.3 | Fechamento da US10 (#11 / Atividade 13): `RolesGuard` global estrito, validade do token (12h + 30 min inatividade), justificativa do `sessionStorage`, relação `1:N` `User.createdById` no ER e Mapa de Domínios atualizado |
 | 24/11/2026 | 1.0.4 | Fechamento da US06 (#3 / Atividade 14): Mercado Pago Checkout Transparente (Cartão + PIX) em sandbox, `MP_PUBLIC_KEY` no boot, `Product`/`Sale`/`SaleItem`/`Payment`/`WebhookEvent` no banco, seção §5.4 (máquina de estados com transições proibidas, autoridade do servidor e idempotência dos dois lados) e Mapa de Domínios atualizado |
+| 25/11/2026 | 1.0.5 | Fechamento da Atividade 15 (deploy em produção): `prisma.config.ts` apontando para `DIRECT_URL`, API no Render (`https://bleep-checkout.onrender.com`), frontend no Render Static Site (`https://bleep-checkout-web.onrender.com`) com rewrite de SPA e banco Neon em São Paulo com pooling; tabela §5.3 e IDs 17/19 consolidados |
 
 ---
 
