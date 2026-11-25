@@ -1,11 +1,12 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { TestBed } from '@angular/core/testing';
 import { Observable, of, Subject, throwError } from 'rxjs';
-import { Customer, CustomersService } from '../data/customers.service';
+import { CreateCustomerPayload, Customer, CustomersService } from '../data/customers.service';
 import { CustomersPage } from './customers.page';
 
 describe('CustomersPage', () => {
   let listSpy: ReturnType<typeof vi.fn>;
+  let createSpy: ReturnType<typeof vi.fn>;
 
   const mariaCustomer: Customer = {
     id: 'cust-1',
@@ -31,17 +32,28 @@ describe('CustomersPage', () => {
     createdAt: '2026-11-21T12:00:00.000Z',
   };
 
-  function setup(initialCustomers: Customer[] | Observable<Customer[]> = []) {
+  function setup(
+    initialCustomers: Customer[] | Observable<Customer[]> = [],
+    createImpl: (payload: CreateCustomerPayload) => Observable<Customer> = (payload) =>
+      of({
+        id: 'cust-new',
+        name: payload.name,
+        cpf: payload.cpf,
+        balanceCents: payload.balanceCents,
+        createdAt: '2026-11-25T12:00:00.000Z',
+      }),
+  ) {
     listSpy = vi.fn().mockReturnValue(
       Array.isArray(initialCustomers) ? of(initialCustomers) : initialCustomers,
     );
+    createSpy = vi.fn().mockImplementation(createImpl);
 
     TestBed.configureTestingModule({
       imports: [CustomersPage],
       providers: [
         {
           provide: CustomersService,
-          useValue: { list: listSpy },
+          useValue: { list: listSpy, create: createSpy },
         },
       ],
     });
@@ -195,5 +207,231 @@ describe('CustomersPage', () => {
 
     expect(el.textContent).not.toContain('Carregando clientes...');
     expect(el.querySelector('[role="alert"]')).toBeNull();
+  });
+
+  it('abre o modal pelo botão + Novo Cliente com saldo inicial padrão 0,00 e fecha por Cancelar ou X sem chamar CustomersService.create', async () => {
+    const fixture = setup([mariaCustomer]);
+    await fixture.whenStable();
+    const el = fixture.nativeElement as HTMLElement;
+
+    expect(el.querySelector('[data-testid="customer-modal"]')).toBeNull();
+
+    el.querySelector<HTMLButtonElement>('[data-testid="open-new-customer-modal"]')!.click();
+    await fixture.whenStable();
+
+    const modal = el.querySelector('[data-testid="customer-modal"]');
+    expect(modal).not.toBeNull();
+    expect(modal?.getAttribute('role')).toBe('dialog');
+    expect(modal?.getAttribute('aria-modal')).toBe('true');
+    expect(modal?.textContent).toContain('Cadastrar Cliente');
+    expect(modal?.textContent).toContain('Preencha os dados e configure o crédito inicial');
+    expect(modal?.textContent).toContain(
+      'O valor inserido será imediatamente provisionado como limite disponível no caixa.',
+    );
+
+    const nameInput = el.querySelector<HTMLInputElement>('[data-testid="input-customer-name"]')!;
+    const cpfInput = el.querySelector<HTMLInputElement>('[data-testid="input-customer-cpf"]')!;
+    const balanceInput = el.querySelector<HTMLInputElement>(
+      '[data-testid="input-customer-balance"]',
+    )!;
+    expect(nameInput.value).toBe('');
+    expect(cpfInput.value).toBe('');
+    expect(balanceInput.value).toBe('0,00');
+
+    nameInput.value = 'Cliente Abandonado';
+    nameInput.dispatchEvent(new Event('input'));
+    cpfInput.value = '123.456.789-01';
+    cpfInput.dispatchEvent(new Event('input'));
+    balanceInput.value = '50,00';
+    balanceInput.dispatchEvent(new Event('input'));
+    await fixture.whenStable();
+
+    el.querySelector<HTMLButtonElement>('[data-testid="cancel-customer-modal"]')!.click();
+    await fixture.whenStable();
+
+    expect(el.querySelector('[data-testid="customer-modal"]')).toBeNull();
+    expect(createSpy).not.toHaveBeenCalled();
+
+    // Reabre e verifica reset dos campos; fecha pelo botão X
+    el.querySelector<HTMLButtonElement>('[data-testid="open-new-customer-modal"]')!.click();
+    await fixture.whenStable();
+    expect(el.querySelector<HTMLInputElement>('[data-testid="input-customer-name"]')!.value).toBe(
+      '',
+    );
+    expect(el.querySelector<HTMLInputElement>('[data-testid="input-customer-cpf"]')!.value).toBe('');
+    expect(
+      el.querySelector<HTMLInputElement>('[data-testid="input-customer-balance"]')!.value,
+    ).toBe('0,00');
+
+    el.querySelector<HTMLButtonElement>('[data-testid="close-customer-modal"]')!.click();
+    await fixture.whenStable();
+    expect(el.querySelector('[data-testid="customer-modal"]')).toBeNull();
+    expect(createSpy).not.toHaveBeenCalled();
+  });
+
+  it('bloqueia envio e exibe erros inline para nome vazio, CPF ausente/inválido e saldo vazio/negativo/inválido', async () => {
+    const fixture = setup([]);
+    await fixture.whenStable();
+    const el = fixture.nativeElement as HTMLElement;
+
+    el.querySelector<HTMLButtonElement>('[data-testid="open-new-customer-modal"]')!.click();
+    await fixture.whenStable();
+
+    const nameInput = el.querySelector<HTMLInputElement>('[data-testid="input-customer-name"]')!;
+    const cpfInput = el.querySelector<HTMLInputElement>('[data-testid="input-customer-cpf"]')!;
+    const balanceInput = el.querySelector<HTMLInputElement>(
+      '[data-testid="input-customer-balance"]',
+    )!;
+    const form = el.querySelector<HTMLFormElement>('[data-testid="customer-modal"] form')!;
+
+    // Limpa o saldo padrão para validar mensagem de campo vazio
+    balanceInput.value = '   ';
+    balanceInput.dispatchEvent(new Event('input'));
+    await fixture.whenStable();
+
+    form.dispatchEvent(new Event('submit'));
+    await fixture.whenStable();
+
+    expect(createSpy).not.toHaveBeenCalled();
+    expect(el.textContent).toContain('Informe o nome do cliente.');
+    expect(el.textContent).toContain('Informe o CPF.');
+    expect(el.textContent).toContain('Informe o saldo inicial.');
+
+    // Nome apenas espaços, CPF inválido e saldo negativo
+    nameInput.value = '   ';
+    nameInput.dispatchEvent(new Event('input'));
+    cpfInput.value = '123.456.789-0';
+    cpfInput.dispatchEvent(new Event('input'));
+    balanceInput.value = '-10,00';
+    balanceInput.dispatchEvent(new Event('input'));
+    await fixture.whenStable();
+
+    form.dispatchEvent(new Event('submit'));
+    await fixture.whenStable();
+
+    expect(createSpy).not.toHaveBeenCalled();
+    expect(el.textContent).toContain('Informe o nome do cliente.');
+    expect(el.textContent).toContain('Informe um CPF válido com 11 dígitos numéricos.');
+    expect(el.textContent).toContain('O saldo inicial não pode ser negativo.');
+
+    // Saldo não numérico também bloqueia
+    balanceInput.value = 'abc';
+    balanceInput.dispatchEvent(new Event('input'));
+    await fixture.whenStable();
+
+    form.dispatchEvent(new Event('submit'));
+    await fixture.whenStable();
+
+    expect(createSpy).not.toHaveBeenCalled();
+    expect(el.textContent).toContain('O saldo inicial não pode ser negativo.');
+  });
+
+  it('envia cliente válido normalizando CPF para 11 dígitos e balanceCents, bloqueia fechamento durante Salvando..., atualiza lista ordenada e cards de resumo', async () => {
+    const create$ = new Subject<Customer>();
+    const fixture = setup([mariaCustomer], () => create$);
+    await fixture.whenStable();
+    const el = fixture.nativeElement as HTMLElement;
+
+    el.querySelector<HTMLButtonElement>('[data-testid="open-new-customer-modal"]')!.click();
+    await fixture.whenStable();
+
+    const nameInput = el.querySelector<HTMLInputElement>('[data-testid="input-customer-name"]')!;
+    const cpfInput = el.querySelector<HTMLInputElement>('[data-testid="input-customer-cpf"]')!;
+    const balanceInput = el.querySelector<HTMLInputElement>(
+      '[data-testid="input-customer-balance"]',
+    )!;
+    const submitButton = el.querySelector<HTMLButtonElement>('[data-testid="submit-customer"]')!;
+    const cancelButton = el.querySelector<HTMLButtonElement>(
+      '[data-testid="cancel-customer-modal"]',
+    )!;
+    const closeButton = el.querySelector<HTMLButtonElement>(
+      '[data-testid="close-customer-modal"]',
+    )!;
+    const form = el.querySelector<HTMLFormElement>('[data-testid="customer-modal"] form')!;
+
+    nameInput.value = '  Bruno Almeida  ';
+    nameInput.dispatchEvent(new Event('input'));
+    cpfInput.value = '222.333.444-55';
+    cpfInput.dispatchEvent(new Event('input'));
+    balanceInput.value = '100,00';
+    balanceInput.dispatchEvent(new Event('input'));
+    await fixture.whenStable();
+
+    form.dispatchEvent(new Event('submit'));
+    await fixture.whenStable();
+
+    expect(createSpy).toHaveBeenCalledTimes(1);
+    expect(createSpy).toHaveBeenCalledWith({
+      name: 'Bruno Almeida',
+      cpf: '22233344455',
+      balanceCents: 10000,
+    });
+    expect(submitButton.disabled).toBe(true);
+    expect(submitButton.textContent).toContain('Salvando...');
+    expect(cancelButton.disabled).toBe(true);
+    expect(closeButton.disabled).toBe(true);
+
+    // Tentativa de fechar ou reenviar durante saving não fecha nem duplica chamada
+    closeButton.click();
+    form.dispatchEvent(new Event('submit'));
+    await fixture.whenStable();
+    expect(el.querySelector('[data-testid="customer-modal"]')).not.toBeNull();
+    expect(createSpy).toHaveBeenCalledTimes(1);
+
+    const createdCustomer: Customer = {
+      id: 'cust-4',
+      name: 'Bruno Almeida',
+      cpf: '22233344455',
+      balanceCents: 10000,
+      createdAt: '2026-11-25T13:00:00.000Z',
+    };
+    create$.next(createdCustomer);
+    create$.complete();
+    await fixture.whenStable();
+
+    expect(el.querySelector('[data-testid="customer-modal"]')).toBeNull();
+    expect(el.querySelector('[data-testid="stat-total-credit"]')?.textContent?.trim()).toBe(
+      'R$\u00a0250,00',
+    );
+    expect(el.querySelector('[data-testid="stat-total-customers"]')?.textContent?.trim()).toBe('2');
+    expect(el.querySelector('[data-testid="stat-positive-balance"]')?.textContent?.trim()).toBe(
+      '2',
+    );
+
+    const rows = Array.from(el.querySelectorAll('tbody tr'));
+    expect(rows).toHaveLength(2);
+    expect(rows[0].textContent).toContain('Bruno Almeida');
+    expect(rows[1].textContent).toContain('Maria Silva');
+  });
+
+  it('aceita saldo inicial 0,00 e exibe erro genérico quando create falha', async () => {
+    const fixture = setup([], () => throwError(() => new Error('Unexpected failure')));
+    await fixture.whenStable();
+    const el = fixture.nativeElement as HTMLElement;
+
+    el.querySelector<HTMLButtonElement>('[data-testid="open-new-customer-modal"]')!.click();
+    await fixture.whenStable();
+
+    const nameInput = el.querySelector<HTMLInputElement>('[data-testid="input-customer-name"]')!;
+    const cpfInput = el.querySelector<HTMLInputElement>('[data-testid="input-customer-cpf"]')!;
+    const form = el.querySelector<HTMLFormElement>('[data-testid="customer-modal"] form')!;
+
+    nameInput.value = 'Carlos Zero';
+    nameInput.dispatchEvent(new Event('input'));
+    cpfInput.value = '33344455566';
+    cpfInput.dispatchEvent(new Event('input'));
+    await fixture.whenStable();
+
+    form.dispatchEvent(new Event('submit'));
+    await fixture.whenStable();
+
+    expect(createSpy).toHaveBeenCalledWith({
+      name: 'Carlos Zero',
+      cpf: '33344455566',
+      balanceCents: 0,
+    });
+    expect(el.querySelector('[data-testid="customer-modal"]')).not.toBeNull();
+    expect(el.querySelector('[data-testid="submit-customer"]')?.textContent).toContain('Salvar');
+    expect(el.textContent).toContain('Não foi possível cadastrar o cliente. Tente novamente.');
   });
 });

@@ -8,6 +8,25 @@ const BRL_FORMATTER = new Intl.NumberFormat('pt-BR', {
   currency: 'BRL',
 });
 
+const CPF_ALLOWED_CHARS = /^[\d.-]+$/;
+const CPF_DIGITS_FORMAT = /^\d{11}$/;
+const NUMERIC_BALANCE_FORMAT = /^-?\d+(?:[.,]\d{1,2})?$/;
+
+function normalizeCpf(raw: string): string | null {
+  const trimmed = raw.trim();
+  if (!CPF_ALLOWED_CHARS.test(trimmed)) return null;
+  const digits = trimmed.replace(/[.-]/g, '');
+  return CPF_DIGITS_FORMAT.test(digits) ? digits : null;
+}
+
+function parseBalanceToCents(raw: string): number | null {
+  const trimmed = raw.trim();
+  if (!NUMERIC_BALANCE_FORMAT.test(trimmed)) return null;
+  const numeric = Number(trimmed.replace(',', '.'));
+  if (!Number.isFinite(numeric)) return null;
+  return Math.round(numeric * 100);
+}
+
 @Component({
   selector: 'app-customers-page',
   imports: [FormsModule],
@@ -20,6 +39,31 @@ export class CustomersPage implements OnInit {
   protected readonly loading = signal(true);
   protected readonly listError = signal<string | null>(null);
   protected readonly searchTerm = signal('');
+
+  protected readonly modalOpen = signal(false);
+  protected readonly name = signal('');
+  protected readonly cpf = signal('');
+  protected readonly initialBalance = signal('0,00');
+  protected readonly submitted = signal(false);
+  protected readonly saving = signal(false);
+  protected readonly submitError = signal<string | null>(null);
+
+  protected readonly nameError = computed(() =>
+    this.name().trim() === '' ? 'Informe o nome do cliente.' : null,
+  );
+
+  protected readonly cpfError = computed(() => {
+    const trimmed = this.cpf().trim();
+    if (trimmed === '') return 'Informe o CPF.';
+    return normalizeCpf(trimmed) ? null : 'Informe um CPF válido com 11 dígitos numéricos.';
+  });
+
+  protected readonly balanceError = computed(() => {
+    const trimmed = this.initialBalance().trim();
+    if (trimmed === '') return 'Informe o saldo inicial.';
+    const cents = parseBalanceToCents(trimmed);
+    return cents !== null && cents >= 0 ? null : 'O saldo inicial não pode ser negativo.';
+  });
 
   // TODO #13: recarga de crédito do cliente entra na US12
   protected readonly addCreditDisabled = true;
@@ -81,5 +125,59 @@ export class CustomersPage implements OnInit {
     if (parts.length === 0) return '';
     if (parts.length === 1) return parts[0][0].toUpperCase();
     return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
+  }
+
+  protected openModal(): void {
+    this.resetForm();
+    this.modalOpen.set(true);
+  }
+
+  protected closeModal(): void {
+    if (this.saving()) return;
+    this.resetForm();
+    this.modalOpen.set(false);
+  }
+
+  protected submit(): void {
+    if (this.saving()) return;
+    this.submitted.set(true);
+
+    if (this.nameError() || this.cpfError() || this.balanceError()) return;
+
+    const normalizedCpf = normalizeCpf(this.cpf());
+    const balanceCents = parseBalanceToCents(this.initialBalance());
+    if (normalizedCpf === null || balanceCents === null || balanceCents < 0) return;
+
+    this.submitError.set(null);
+    this.saving.set(true);
+
+    this.customersService
+      .create({
+        name: this.name().trim(),
+        cpf: normalizedCpf,
+        balanceCents,
+      })
+      .subscribe({
+        next: (created) => {
+          this.customers.update((current) =>
+            [...current, created].sort((a, b) => a.name.localeCompare(b.name)),
+          );
+          this.saving.set(false);
+          this.closeModal();
+        },
+        error: () => {
+          this.saving.set(false);
+          this.submitError.set('Não foi possível cadastrar o cliente. Tente novamente.');
+        },
+      });
+  }
+
+  private resetForm(): void {
+    this.name.set('');
+    this.cpf.set('');
+    this.initialBalance.set('0,00');
+    this.submitted.set(false);
+    this.saving.set(false);
+    this.submitError.set(null);
   }
 }

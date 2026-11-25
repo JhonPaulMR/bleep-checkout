@@ -14,6 +14,7 @@
       <button
         type="button"
         data-testid="open-new-customer-modal"
+        (click)="openModal()"
         class="inline-flex items-center justify-center gap-xs rounded-xl bg-primaria px-lg py-sm text-corpo-destaque text-superficie shadow-sm transition-colors hover:brightness-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primaria"
       >
         <span class="material-symbols-outlined text-[20px]" aria-hidden="true">add</span>
@@ -187,4 +188,157 @@
       }
     </section>
   </div>
+
+  @if (modalOpen()) {
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="customer-modal-title"
+      data-testid="customer-modal"
+      class="fixed inset-0 z-50 flex items-center justify-center bg-texto/40 p-md backdrop-blur-sm"
+    >
+      <div
+        class="w-full max-w-lg rounded-2xl border border-desabilitado/60 bg-superficie p-lg shadow-xl"
+      >
+        <div class="mb-lg flex items-start justify-between gap-md">
+          <div class="flex items-start gap-sm">
+            <div
+              class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primaria/10 text-primaria"
+            >
+              <span class="material-symbols-outlined" aria-hidden="true">person_add</span>
+            </div>
+            <div>
+              <h2 id="customer-modal-title" class="text-titulo-secao text-texto">
+                Cadastrar Cliente
+              </h2>
+              <p class="mt-xs text-legenda text-texto-suave">
+                Preencha os dados e configure o crédito inicial
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            aria-label="Fechar modal"
+            data-testid="close-customer-modal"
+            [disabled]="saving()"
+            (click)="closeModal()"
+            class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-texto-suave transition-colors hover:bg-fundo hover:text-texto focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primaria disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <span class="material-symbols-outlined text-[20px]" aria-hidden="true">close</span>
+          </button>
+        </div>
+
+        <form novalidate class="flex flex-col gap-md" (ngSubmit)="submit()">
+          <div class="flex flex-col gap-xs">
+            <label for="customer-name" class="text-corpo-destaque text-texto">
+              Nome <span class="text-perigo">*</span>
+            </label>
+            <input
+              id="customer-name"
+              type="text"
+              name="customerName"
+              data-testid="input-customer-name"
+              placeholder="Ex.: Maria Silva"
+              [ngModel]="name()"
+              (ngModelChange)="name.set($event)"
+              class="rounded-xl border px-md py-sm text-corpo text-texto placeholder:text-texto-suave focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primaria"
+              [class.border-perigo]="submitted() && nameError()"
+              [class.border-desabilitado]="!(submitted() && nameError())"
+            />
+            @if (submitted() && nameError(); as message) {
+              <p class="text-legenda text-perigo" role="alert">{{ message }}</p>
+            }
+          </div>
+
+          <div class="flex flex-col gap-xs">
+            <label for="customer-cpf" class="text-corpo-destaque text-texto">
+              CPF <span class="text-perigo">*</span>
+            </label>
+            <input
+              id="customer-cpf"
+              type="text"
+              name="customerCpf"
+              inputmode="numeric"
+              data-testid="input-customer-cpf"
+              placeholder="000.000.000-00"
+              [ngModel]="cpf()"
+              (ngModelChange)="cpf.set($event)"
+              class="rounded-xl border px-md py-sm font-mono text-corpo text-texto placeholder:text-texto-suave focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primaria"
+              [class.border-perigo]="submitted() && cpfError()"
+              [class.border-desabilitado]="!(submitted() && cpfError())"
+            />
+            @if (submitted() && cpfError(); as message) {
+              <p class="text-legenda text-perigo" role="alert">{{ message }}</p>
+            }
+          </div>
+
+          <div class="flex flex-col gap-xs">
+            <label for="customer-balance" class="text-corpo-destaque text-texto">
+              Saldo inicial (R$) <span class="text-perigo">*</span>
+            </label>
+            <div
+              class="flex items-center rounded-xl border bg-superficie focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-primaria"
+              [class.border-perigo]="submitted() && balanceError()"
+              [class.border-desabilitado]="!(submitted() && balanceError())"
+            >
+              <span class="pl-md text-corpo text-texto-suave">R$</span>
+              <input
+                id="customer-balance"
+                type="text"
+                name="customerBalance"
+                inputmode="decimal"
+                data-testid="input-customer-balance"
+                placeholder="0,00"
+                [ngModel]="initialBalance()"
+                (ngModelChange)="initialBalance.set($event)"
+                class="w-full bg-transparent px-sm py-sm text-corpo text-texto placeholder:text-texto-suave focus-visible:outline-none"
+              />
+            </div>
+            @if (submitted() && balanceError(); as message) {
+              <p class="text-legenda text-perigo" role="alert">{{ message }}</p>
+            }
+          </div>
+
+          <div
+            class="flex items-start gap-sm rounded-xl border border-desabilitado/60 bg-fundo p-sm text-legenda text-texto-suave"
+          >
+            <span class="material-symbols-outlined text-[18px] text-primaria" aria-hidden="true">
+              info
+            </span>
+            <p>
+              O valor inserido será imediatamente provisionado como limite disponível no caixa.
+            </p>
+          </div>
+
+          @if (submitError(); as message) {
+            <p class="text-legenda text-perigo" role="alert">{{ message }}</p>
+          }
+
+          <div class="mt-sm flex items-center justify-end gap-sm">
+            <button
+              type="button"
+              data-testid="cancel-customer-modal"
+              [disabled]="saving()"
+              (click)="closeModal()"
+              class="rounded-xl border border-desabilitado px-lg py-sm text-corpo-destaque text-texto transition-colors hover:bg-fundo focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primaria disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              data-testid="submit-customer"
+              [disabled]="saving()"
+              class="rounded-xl bg-primaria px-lg py-sm text-corpo-destaque text-superficie shadow-sm transition-colors hover:brightness-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primaria disabled:cursor-not-allowed disabled:bg-desabilitado"
+            >
+              @if (saving()) {
+                Salvando...
+              } @else {
+                Salvar
+              }
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  }
 </main>
