@@ -37,6 +37,12 @@ enum PaymentStatus {
   ABANDONED
 }
 
+enum CreditType {
+  INITIAL
+  TOP_UP
+  SALE_DEBIT
+}
+
 model User {
   id           String   @id @default(uuid())
   name         String
@@ -62,19 +68,47 @@ model Product {
   saleItems  SaleItem[]
 }
 
-model Sale {
+model Customer {
+  id                 String              @id @default(uuid())
+  name               String
+  cpf                String              @unique
+  balanceCents       Int
+  createdAt          DateTime            @default(now())
+  sales              Sale[]
+  creditTransactions CreditTransaction[]
+}
+
+model CreditTransaction {
   id          String     @id @default(uuid())
-  number      Int        @unique @default(autoincrement())
-  operatorId  String
-  operator    User       @relation(fields: [operatorId], references: [id])
-  status      SaleStatus @default(OPEN)
-  totalCents  Int
+  customerId  String
+  customer    Customer   @relation(fields: [customerId], references: [id])
+  saleId      String?
+  sale        Sale?      @relation(fields: [saleId], references: [id])
+  type        CreditType
+  amountCents Int
   createdAt   DateTime   @default(now())
-  completedAt DateTime?
-  items       SaleItem[]
-  payments    Payment[]
+
+  @@index([customerId])
+  @@index([saleId])
+}
+
+model Sale {
+  id                 String              @id @default(uuid())
+  number             Int                 @unique @default(autoincrement())
+  operatorId         String
+  operator           User                @relation(fields: [operatorId], references: [id])
+  customerId         String?
+  customer           Customer?           @relation(fields: [customerId], references: [id])
+  status             SaleStatus          @default(OPEN)
+  totalCents         Int
+  createdAt          DateTime            @default(now())
+  completedAt        DateTime?
+  items              SaleItem[]
+  payments           Payment[]
+  creditTransactions CreditTransaction[]
 
   @@index([operatorId])
+  @@index([customerId])
 }
 
 model SaleItem {

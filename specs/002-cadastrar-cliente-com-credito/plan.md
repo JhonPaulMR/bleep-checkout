@@ -18,7 +18,7 @@
 
 ## Tarefas
 
-- [ ] **Tarefa 1 — Criar migration de `Customer`/`CreditTransaction` e implementar `POST/GET /customers` na API (unit + e2e)**
+- [x] **Tarefa 1 — Criar migration de `Customer`/`CreditTransaction` e implementar `POST/GET /customers` na API (unit + e2e)**
   - Cobre: CA1 (lado da API e transação `INITIAL`), CA2 (lado da API), CA3 (lado da API), CA4 (lado da API), CA5 (lado da API), CA6
   - Teste primeiro: testes unitários em `customers.service.spec.ts` (criação com `balanceCents > 0` gravando `CreditTransaction(INITIAL)` na mesma transação; criação com `balanceCents === 0` sem transação; conflito `409` com mensagem exata em CPF duplicado; listagem ordenada por nome) e testes e2e em `apps/api/test/customers.e2e-spec.ts` (`POST /customers` `201` para `MANAGER` com `balanceCents > 0` e `0` + visível em `GET /customers` para `MANAGER` e `OPERATOR`; `409` CPF duplicado; `400` para saldo negativo, nome vazio, CPF inválido ou campo extra; `403` para `OPERATOR` em `POST /customers`; `401` sem token/token inválido em `POST` e `GET`); falham porque schema/módulo ainda não existem
   - Arquivos previstos: `apps/api/prisma/schema.prisma`, `apps/api/prisma/migrations/<timestamp>_create_customers_and_credit_transactions/migration.sql`, `apps/api/src/modules/customers/dto/create-customer.dto.ts`, `apps/api/src/modules/customers/customers.service.ts`, `apps/api/src/modules/customers/customers.service.spec.ts`, `apps/api/src/modules/customers/customers.controller.ts`, `apps/api/src/modules/customers/customers.module.ts`, `apps/api/src/app.module.ts`, `apps/api/test/customers.e2e-spec.ts`
