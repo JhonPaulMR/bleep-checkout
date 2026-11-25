@@ -1,0 +1,190 @@
+<main class="min-h-screen bg-fundo">
+  <div class="mx-auto flex max-w-7xl flex-col gap-lg px-lg py-xl">
+    <header class="flex flex-col gap-md sm:flex-row sm:items-center sm:justify-between">
+      <div class="flex items-center gap-md">
+        <div class="h-12 w-1.5 shrink-0 rounded-full bg-primaria" aria-hidden="true"></div>
+        <div>
+          <h1 class="text-titulo-pagina text-texto">Clientes</h1>
+          <p class="mt-xs text-corpo text-texto-suave">
+            Cadastre clientes e o crédito que eles podem usar para pagar
+          </p>
+        </div>
+      </div>
+
+      <button
+        type="button"
+        data-testid="open-new-customer-modal"
+        class="inline-flex items-center justify-center gap-xs rounded-xl bg-primaria px-lg py-sm text-corpo-destaque text-superficie shadow-sm transition-colors hover:brightness-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primaria"
+      >
+        <span class="material-symbols-outlined text-[20px]" aria-hidden="true">add</span>
+        <span>+ Novo Cliente</span>
+      </button>
+    </header>
+
+    <section aria-label="Resumo de clientes" class="grid grid-cols-1 gap-md md:grid-cols-3">
+      <div
+        class="flex items-start justify-between rounded-2xl border border-desabilitado/60 bg-superficie p-lg shadow-sm"
+      >
+        <div>
+          <p class="text-legenda text-texto-suave">Total em Créditos Ativos</p>
+          <p data-testid="stat-total-credit" class="mt-xs text-valor-destaque text-sucesso">
+            {{ formatBalance(totalCreditCents()) }}
+          </p>
+          <p class="mt-xs text-legenda text-texto-suave">
+            {{ positiveBalanceCount() }} clientes com saldo positivo
+          </p>
+        </div>
+        <div
+          class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-sucesso/10 text-sucesso"
+        >
+          <span class="material-symbols-outlined" aria-hidden="true">account_balance_wallet</span>
+        </div>
+      </div>
+
+      <div
+        class="flex items-start justify-between rounded-2xl border border-desabilitado/60 bg-superficie p-lg shadow-sm"
+      >
+        <div>
+          <p class="text-legenda text-texto-suave">Base Cadastrada</p>
+          <p data-testid="stat-total-customers" class="mt-xs text-valor-destaque text-texto">
+            {{ customers().length }}
+          </p>
+          <p class="mt-xs text-legenda text-texto-suave">
+            {{ zeroBalanceCount() }} com saldo zerado
+          </p>
+        </div>
+        <div
+          class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primaria/10 text-primaria"
+        >
+          <span class="material-symbols-outlined" aria-hidden="true">group</span>
+        </div>
+      </div>
+
+      <div
+        class="flex items-start justify-between rounded-2xl border border-desabilitado/60 bg-superficie p-lg shadow-sm"
+      >
+        <div>
+          <p class="text-legenda text-texto-suave">Clientes com Saldo</p>
+          <p data-testid="stat-positive-balance" class="mt-xs text-valor-destaque text-texto">
+            {{ positiveBalanceCount() }}
+          </p>
+          <p class="mt-xs text-legenda text-texto-suave">
+            Operações seguras e sem saldo negativo
+          </p>
+        </div>
+        <div
+          class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primaria/10 text-primaria"
+        >
+          <span class="material-symbols-outlined" aria-hidden="true">insights</span>
+        </div>
+      </div>
+    </section>
+
+    <section
+      aria-label="Diretório de Clientes"
+      class="overflow-hidden rounded-2xl border border-desabilitado/60 bg-superficie shadow-sm"
+    >
+      <div
+        class="flex flex-col gap-md border-b border-desabilitado/60 p-lg sm:flex-row sm:items-center sm:justify-between"
+      >
+        <div class="flex items-center gap-sm">
+          <span class="material-symbols-outlined text-primaria" aria-hidden="true">badge</span>
+          <h2 class="text-titulo-secao text-texto">Diretório de Clientes</h2>
+          <span
+            class="inline-flex rounded-full bg-fundo px-sm py-xs text-legenda font-semibold text-texto-suave"
+          >
+            {{ filteredCustomers().length }} registros
+          </span>
+        </div>
+
+        <div
+          class="flex w-full items-center gap-sm rounded-xl border border-desabilitado/60 bg-fundo px-md py-xs sm:max-w-xs"
+        >
+          <span class="material-symbols-outlined text-texto-suave" aria-hidden="true">search</span>
+          <input
+            type="text"
+            name="searchTerm"
+            data-testid="customer-search-input"
+            placeholder="Buscar por nome ou CPF..."
+            aria-label="Buscar por nome ou CPF"
+            class="w-full bg-transparent py-xs text-corpo text-texto placeholder:text-texto-suave focus-visible:outline-none"
+            [ngModel]="searchTerm()"
+            (ngModelChange)="searchTerm.set($event)"
+          />
+        </div>
+      </div>
+
+      @if (loading()) {
+        <p class="p-xl text-center text-corpo text-texto-suave">Carregando clientes...</p>
+      } @else if (listError(); as message) {
+        <p class="p-lg text-corpo text-perigo" role="alert">{{ message }}</p>
+      } @else if (customers().length === 0) {
+        <div class="p-xl text-center">
+          <p class="text-corpo text-texto-suave">Nenhum cliente cadastrado ainda.</p>
+        </div>
+      } @else if (filteredCustomers().length === 0) {
+        <div class="p-xl text-center">
+          <p class="text-corpo text-texto-suave">Nenhum cliente encontrado para a busca.</p>
+        </div>
+      } @else {
+        <div class="overflow-x-auto">
+          <table class="w-full border-collapse text-left">
+            <thead class="border-b border-desabilitado/60 bg-fundo/60">
+              <tr>
+                <th class="px-lg py-md text-legenda font-semibold text-texto-suave">Nome</th>
+                <th class="px-lg py-md text-legenda font-semibold text-texto-suave">CPF</th>
+                <th class="px-lg py-md text-right text-legenda font-semibold text-texto-suave">
+                  Saldo de Crédito
+                </th>
+                <th class="px-lg py-md text-right text-legenda font-semibold text-texto-suave">
+                  Ações
+                </th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-desabilitado/60">
+              @for (customer of filteredCustomers(); track customer.id) {
+                <tr class="transition-colors hover:bg-fundo/40">
+                  <td class="px-lg py-md">
+                    <div class="flex items-center gap-sm">
+                      <span
+                        class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primaria/10 text-legenda font-semibold text-primaria"
+                        aria-hidden="true"
+                      >
+                        {{ getInitials(customer.name) }}
+                      </span>
+                      <span class="text-corpo font-semibold text-texto">{{ customer.name }}</span>
+                    </div>
+                  </td>
+                  <td class="px-lg py-md font-mono text-corpo text-texto-suave">
+                    {{ formatCpf(customer.cpf) }}
+                  </td>
+                  <td class="px-lg py-md text-right">
+                    <span
+                      class="inline-flex rounded-full bg-sucesso/10 px-sm py-xs text-legenda font-semibold text-sucesso"
+                    >
+                      {{ formatBalance(customer.balanceCents) }}
+                    </span>
+                  </td>
+                  <td class="px-lg py-md text-right">
+                    <!-- TODO #13: recarga de crédito do cliente entra na US12 -->
+                    <button
+                      type="button"
+                      [disabled]="addCreditDisabled"
+                      aria-label="Adicionar crédito"
+                      class="inline-flex items-center gap-xs rounded-lg border border-desabilitado px-sm py-xs text-legenda text-texto-suave disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <span class="material-symbols-outlined text-[18px]" aria-hidden="true">
+                        add_card
+                      </span>
+                      <span>+ Adicionar crédito</span>
+                    </button>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    </section>
+  </div>
+</main>
