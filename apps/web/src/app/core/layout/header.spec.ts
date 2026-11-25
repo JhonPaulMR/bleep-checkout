@@ -18,7 +18,7 @@ describe('Header', () => {
     return fixture.nativeElement as HTMLElement;
   }
 
-  it('gerente vê Produtos e Operadores com seus respectivos caminhos', async () => {
+  it('gerente vê Produtos, Clientes e Operadores com seus respectivos caminhos', async () => {
     TestBed.inject(AuthService).startSession('t', { name: 'Maria', role: 'MANAGER' });
     const el = await render();
 
@@ -28,11 +28,12 @@ describe('Header', () => {
     }));
     expect(links).toEqual([
       { label: 'Produtos', href: '/produtos' },
+      { label: 'Clientes', href: '/clientes' },
       { label: 'Operadores', href: '/operadores' },
     ]);
   });
 
-  it('operador vê só Caixa e não vê Produtos (CA4)', async () => {
+  it('operador vê só Caixa e não vê Clientes nem Produtos (CA4, CA5)', async () => {
     TestBed.inject(AuthService).startSession('t', { name: 'João', role: 'OPERATOR' });
     const el = await render();
 
@@ -41,6 +42,7 @@ describe('Header', () => {
       href: a.getAttribute('href'),
     }));
     expect(links).toEqual([{ label: 'Caixa', href: '/caixa' }]);
+    expect(links.some((l) => l.label === 'Clientes')).toBe(false);
   });
 
   it('exibe nome do usuário e papel em português para gerente', async () => {
