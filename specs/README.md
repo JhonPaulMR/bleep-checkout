@@ -6,6 +6,6 @@
 | #11 | [011-cadastrar-operador](011-cadastrar-operador/spec.md) | implementada | US10 — Cadastrar operador |
 | #3 | [003-pagar-via-pix](003-pagar-via-pix/spec.md) | implementada | US06 — Pagar venda via gateway (Cartão + PIX) |
 | #1 | [001-cadastrar-produto](001-cadastrar-produto/spec.md) | implementada | US01 — Cadastrar produto |
-| #2 | [002-cadastrar-cliente-com-credito](002-cadastrar-cliente-com-credito/spec.md) | aprovada | US02 — Cadastrar cliente com crédito |
+| #2 | [002-cadastrar-cliente-com-credito](002-cadastrar-cliente-com-credito/spec.md) | implementada | US02 — Cadastrar cliente com crédito |
 
 Estados: `rascunho` · `aprovada` · `implementada` · `bloqueada`
