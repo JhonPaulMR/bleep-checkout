@@ -25,7 +25,7 @@
   - Teste primeiro: testes unitários em `products.service.spec.ts` (`list()` faz `GET /products` e `create()` faz `POST /products` desembrulhando `{ data }`) e atualização de `header.spec.ts` (gerente vê **Produtos** e **Operadores**, nome/papel e botão **Sair**; operador vê **Caixa** e não vê **Produtos**); falham porque `ProductsService` não existe e o `Header` ainda não segue o layout do protótipo
   - Arquivos previstos: `apps/web/src/index.html`, `apps/web/src/app/features/products/data/products.service.ts`, `apps/web/src/app/features/products/data/products.service.spec.ts`, `apps/web/src/app/core/layout/header.ts`, `apps/web/src/app/core/layout/header.spec.ts`, `apps/web/src/app/app.routes.ts`
 
-- [ ] **Tarefa 3 — Construir tela de Produtos (listagem, cards de resumo, busca local e estado vazio) fiel ao protótipo**
+- [x] **Tarefa 3 — Construir tela de Produtos (listagem, cards de resumo, busca local e estado vazio) fiel ao protótipo**
   - Cobre: CA1 (listagem e layout da tela), CA6 (estado vazio e busca sem resultados)
   - Teste primeiro: testes unitários em `products.page.spec.ts` verificando renderização da tabela de produtos com preço formatado em R$ e status `Disponível`, cards de resumo com contagem real, filtro local por nome e código de barras, estado vazio quando não há produtos ou quando a busca não encontra correspondência, e botões Editar/Desativar desabilitados (`// TODO #14`); falham porque `ProductsPage` é apenas um placeholder
   - Arquivos previstos: `apps/web/src/app/features/products/pages/products.page.ts`, `apps/web/src/app/features/products/pages/products.page.html`, `apps/web/src/app/features/products/pages/products.page.spec.ts`

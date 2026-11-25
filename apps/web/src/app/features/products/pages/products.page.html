@@ -1,0 +1,171 @@
+<main class="min-h-screen bg-fundo">
+  <div class="mx-auto max-w-7xl px-lg py-xl">
+    <header class="mb-lg flex flex-col gap-md sm:flex-row sm:items-center sm:justify-between">
+      <div>
+        <h1 class="text-titulo-pagina text-texto">Produtos</h1>
+        <p class="mt-xs text-corpo text-texto-suave">
+          Cadastre produtos com nome, código de barras e preço para vendê-los no caixa
+        </p>
+      </div>
+
+      <button
+        type="button"
+        data-testid="open-new-product-modal"
+        class="inline-flex items-center justify-center gap-xs rounded-xl bg-primaria px-lg py-sm text-corpo-destaque text-superficie shadow-sm transition-colors hover:brightness-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primaria"
+      >
+        <span class="material-symbols-outlined text-[20px]" aria-hidden="true">add</span>
+        <span>+ Novo Produto</span>
+      </button>
+    </header>
+
+    <section aria-label="Resumo do catálogo" class="mb-lg grid grid-cols-1 gap-md sm:grid-cols-2">
+      <div
+        class="flex items-center justify-between rounded-2xl border border-desabilitado/60 bg-superficie p-lg shadow-sm"
+      >
+        <div>
+          <p class="text-legenda text-texto-suave">Produtos ativos</p>
+          <p data-testid="active-products-count" class="mt-xs text-valor-destaque text-texto">
+            {{ activeProductsCount() }}
+          </p>
+        </div>
+        <div
+          class="flex h-12 w-12 items-center justify-center rounded-xl bg-primaria/10 text-primaria"
+        >
+          <span class="material-symbols-outlined" aria-hidden="true">inventory_2</span>
+        </div>
+      </div>
+
+      <div
+        class="flex items-center justify-between rounded-2xl border border-desabilitado/60 bg-superficie p-lg shadow-sm"
+      >
+        <div>
+          <p class="text-legenda text-texto-suave">Códigos de barras duplicados</p>
+          <p data-testid="duplicate-barcodes-count" class="mt-xs text-valor-destaque text-texto">
+            0
+          </p>
+        </div>
+        <div
+          class="flex h-12 w-12 items-center justify-center rounded-xl bg-sucesso/10 text-sucesso"
+        >
+          <span class="material-symbols-outlined" aria-hidden="true">check_circle</span>
+        </div>
+      </div>
+    </section>
+
+    <section
+      aria-label="Busca de produtos"
+      class="mb-lg flex items-center gap-sm rounded-2xl border border-desabilitado/60 bg-superficie p-sm shadow-sm"
+    >
+      <span class="material-symbols-outlined pl-xs text-texto-suave" aria-hidden="true">
+        search
+      </span>
+      <input
+        type="text"
+        name="searchTerm"
+        placeholder="Buscar por código ou nome..."
+        aria-label="Buscar por código ou nome"
+        class="w-full bg-transparent py-xs pr-sm text-corpo text-texto placeholder:text-texto-suave focus-visible:outline-none"
+        [ngModel]="searchTerm()"
+        (ngModelChange)="searchTerm.set($event)"
+      />
+    </section>
+
+    <section
+      aria-label="Catálogo de produtos"
+      class="overflow-hidden rounded-2xl border border-desabilitado/60 bg-superficie shadow-sm"
+    >
+      @if (loading()) {
+        <p class="p-xl text-center text-corpo text-texto-suave">Carregando produtos...</p>
+      } @else if (listError(); as message) {
+        <p class="p-lg text-corpo text-perigo" role="alert">{{ message }}</p>
+      } @else if (products().length === 0) {
+        <div class="p-xl text-center">
+          <p class="text-corpo text-texto-suave">Nenhum produto cadastrado ainda.</p>
+        </div>
+      } @else if (filteredProducts().length === 0) {
+        <div class="p-xl text-center">
+          <p class="text-corpo text-texto-suave">Nenhum produto encontrado para a busca.</p>
+        </div>
+      } @else {
+        <div class="overflow-x-auto">
+          <table class="w-full border-collapse text-left">
+            <thead class="border-b border-desabilitado/60 bg-fundo/60">
+              <tr>
+                <th class="px-lg py-md text-legenda font-semibold text-texto-suave">
+                  Código de barras
+                </th>
+                <th class="px-lg py-md text-legenda font-semibold text-texto-suave">Produto</th>
+                <th class="px-lg py-md text-right text-legenda font-semibold text-texto-suave">
+                  Preço unitário
+                </th>
+                <th class="px-lg py-md text-center text-legenda font-semibold text-texto-suave">
+                  Status
+                </th>
+                <th class="px-lg py-md text-right text-legenda font-semibold text-texto-suave">
+                  Ações
+                </th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-desabilitado/60">
+              @for (product of filteredProducts(); track product.id) {
+                <tr class="transition-colors hover:bg-fundo/40">
+                  <td class="px-lg py-md font-mono text-corpo text-texto-suave">
+                    {{ product.barcode }}
+                  </td>
+                  <td class="px-lg py-md text-corpo font-semibold text-texto">
+                    {{ product.name }}
+                  </td>
+                  <td class="px-lg py-md text-right text-corpo-destaque text-texto">
+                    {{ formatPrice(product.priceCents) }}
+                  </td>
+                  <td class="px-lg py-md text-center">
+                    @if (product.active) {
+                      <span
+                        class="inline-flex rounded-full bg-sucesso/10 px-sm py-xs text-legenda font-semibold text-sucesso"
+                      >
+                        Disponível
+                      </span>
+                    } @else {
+                      <span
+                        class="inline-flex rounded-full bg-perigo/10 px-sm py-xs text-legenda font-semibold text-perigo"
+                      >
+                        Desativado
+                      </span>
+                    }
+                  </td>
+                  <td class="px-lg py-md text-right">
+                    <!-- TODO #14: edição e desativação de produtos entram na US13 -->
+                    <div class="inline-flex items-center justify-end gap-xs">
+                      <button
+                        type="button"
+                        [disabled]="actionsDisabled"
+                        aria-label="Editar produto"
+                        class="inline-flex items-center gap-xs rounded-lg border border-desabilitado px-sm py-xs text-legenda text-texto-suave disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        <span class="material-symbols-outlined text-[18px]" aria-hidden="true">
+                          edit
+                        </span>
+                        <span>Editar</span>
+                      </button>
+                      <button
+                        type="button"
+                        [disabled]="actionsDisabled"
+                        aria-label="Desativar produto"
+                        class="inline-flex items-center gap-xs rounded-lg border border-desabilitado px-sm py-xs text-legenda text-texto-suave disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        <span class="material-symbols-outlined text-[18px]" aria-hidden="true">
+                          block
+                        </span>
+                        <span>Desativar</span>
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    </section>
+  </div>
+</main>
