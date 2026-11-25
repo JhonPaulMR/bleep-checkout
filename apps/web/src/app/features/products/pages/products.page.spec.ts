@@ -1,5 +1,12 @@
+import { HttpErrorResponse, provideHttpClient, withInterceptors } from '@angular/common/http';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
+import { provideRouter, Router } from '@angular/router';
 import { Observable, of, Subject, throwError } from 'rxjs';
+import { authInterceptor } from '../../../core/auth/auth.interceptor';
+import { AuthService } from '../../../core/auth/auth.service';
+import { IdleSessionService } from '../../../core/auth/idle-session.service';
+import { API_URL } from '../../../core/config/api-url';
 import { CreateProductPayload, Product, ProductsService } from '../data/products.service';
 import { ProductsPage } from './products.page';
 
@@ -348,8 +355,82 @@ describe('ProductsPage', () => {
     expect(rows[1].textContent).toContain('Leite Integral 1L');
   });
 
-  it('exibe mensagem genérica de erro e sai do estado Salvando... quando create() falha', async () => {
-    const fixture = setup([], () => throwError(() => new Error('Server error')));
+  it('409 no cadastro exibe mensagem de código duplicado com ícone de erro, borda de perigo, oculta badge EAN válido e mantém campos preenchidos', async () => {
+    const fixture = setup([cafeProduct]);
+    createSpy.mockReturnValue(
+      throwError(
+        () =>
+          new HttpErrorResponse({
+            status: 409,
+            statusText: 'Conflict',
+            error: { message: 'Já existe um produto com este código de barras.' },
+          }),
+      ),
+    );
+    await fixture.whenStable();
+    const el = fixture.nativeElement as HTMLElement;
+
+    el.querySelector<HTMLButtonElement>('[data-testid="open-new-product-modal"]')!.click();
+    await fixture.whenStable();
+
+    const nameInput = el.querySelector<HTMLInputElement>('[data-testid="input-product-name"]')!;
+    const barcodeInput = el.querySelector<HTMLInputElement>(
+      '[data-testid="input-product-barcode"]',
+    )!;
+    const priceInput = el.querySelector<HTMLInputElement>('[data-testid="input-product-price"]')!;
+    const submitButton = el.querySelector<HTMLButtonElement>('[data-testid="submit-product"]')!;
+    const form = el.querySelector<HTMLFormElement>('[data-testid="product-modal"] form')!;
+
+    nameInput.value = 'Café Repetido';
+    nameInput.dispatchEvent(new Event('input'));
+    barcodeInput.value = '7891000100103';
+    barcodeInput.dispatchEvent(new Event('input'));
+    priceInput.value = '19.90';
+    priceInput.dispatchEvent(new Event('input'));
+    await fixture.whenStable();
+
+    expect(el.textContent).toContain('EAN válido');
+
+    form.dispatchEvent(new Event('submit'));
+    await fixture.whenStable();
+
+    expect(submitButton.disabled).toBe(false);
+    expect(submitButton.textContent).toContain('Salvar Produto');
+    expect(el.querySelector('[data-testid="product-modal"]')).not.toBeNull();
+
+    // Mensagem de conflito 409 com ícone de erro e alert
+    expect(el.textContent).toContain('Já existe um produto com este código de barras.');
+    const alert = el.querySelector('[role="alert"]');
+    expect(alert).not.toBeNull();
+    expect(alert?.textContent).toContain('Já existe um produto com este código de barras.');
+    expect(alert?.textContent).toContain('error');
+
+    // Badge EAN válido não deve ser exibido durante o conflito
+    expect(el.textContent).not.toContain('EAN válido');
+
+    // Borda de erro no input de código de barras
+    expect(barcodeInput.classList.contains('border-perigo')).toBe(true);
+    expect(barcodeInput.classList.contains('border-2')).toBe(true);
+
+    // Campos mantidos preenchidos para correção
+    expect(nameInput.value).toBe('Café Repetido');
+    expect(barcodeInput.value).toBe('7891000100103');
+    expect(priceInput.value).toBe('19.90');
+
+    // Alterar o campo barcode limpa o erro de conflito e restabelece a validação
+    barcodeInput.value = '7891000100104';
+    barcodeInput.dispatchEvent(new Event('input'));
+    await fixture.whenStable();
+
+    expect(el.textContent).not.toContain('Já existe um produto com este código de barras.');
+    expect(el.textContent).toContain('EAN válido');
+    expect(barcodeInput.classList.contains('border-perigo')).toBe(false);
+  });
+
+  it('falha de rede no cadastro exibe mensagem de conexão, mantém campos preenchidos e retira botão do carregamento', async () => {
+    const fixture = setup([], () =>
+      throwError(() => new HttpErrorResponse({ status: 0, statusText: 'Unknown Error' })),
+    );
     await fixture.whenStable();
     const el = fixture.nativeElement as HTMLElement;
 
@@ -378,6 +459,81 @@ describe('ProductsPage', () => {
     expect(el.querySelector('[data-testid="product-modal"]')).not.toBeNull();
     expect(submitButton.disabled).toBe(false);
     expect(submitButton.textContent).toContain('Salvar Produto');
-    expect(el.textContent).toContain('Não foi possível cadastrar o produto. Tente novamente.');
+    expect(el.textContent).toContain('Não foi possível conectar. Tente novamente.');
+    expect(el.querySelector('[role="alert"]')?.textContent).toContain(
+      'Não foi possível conectar. Tente novamente.',
+    );
+    expect(nameInput.value).toBe('Feijão Carioca 1kg');
+    expect(barcodeInput.value).toBe('7895000500505');
+    expect(priceInput.value).toBe('9.50');
+  });
+
+  it('401 no envio do cadastro dispara authInterceptor, limpa sessão, leva ao login com aviso e não adiciona produto', async () => {
+    sessionStorage.clear();
+    TestBed.configureTestingModule({
+      imports: [ProductsPage],
+      providers: [
+        provideRouter([]),
+        provideHttpClient(withInterceptors([authInterceptor])),
+        provideHttpClientTesting(),
+      ],
+    });
+
+    const controller = TestBed.inject(HttpTestingController);
+    const auth = TestBed.inject(AuthService);
+    const idle = TestBed.inject(IdleSessionService);
+    const apiUrl = TestBed.inject(API_URL);
+    const navigate = vi.spyOn(TestBed.inject(Router), 'navigateByUrl').mockResolvedValue(true);
+
+    auth.startSession('expired-token', { name: 'Gerente', role: 'MANAGER' });
+
+    const fixture = TestBed.createComponent(ProductsPage);
+    fixture.detectChanges();
+
+    const listReq = controller.expectOne(`${apiUrl}/products`);
+    expect(listReq.request.method).toBe('GET');
+    listReq.flush({ data: [cafeProduct] });
+    await fixture.whenStable();
+
+    const el = fixture.nativeElement as HTMLElement;
+    el.querySelector<HTMLButtonElement>('[data-testid="open-new-product-modal"]')!.click();
+    await fixture.whenStable();
+
+    const nameInput = el.querySelector<HTMLInputElement>('[data-testid="input-product-name"]')!;
+    const barcodeInput = el.querySelector<HTMLInputElement>(
+      '[data-testid="input-product-barcode"]',
+    )!;
+    const priceInput = el.querySelector<HTMLInputElement>('[data-testid="input-product-price"]')!;
+    const form = el.querySelector<HTMLFormElement>('[data-testid="product-modal"] form')!;
+
+    nameInput.value = 'Novo Café';
+    nameInput.dispatchEvent(new Event('input'));
+    barcodeInput.value = '7899999999999';
+    barcodeInput.dispatchEvent(new Event('input'));
+    priceInput.value = '15.00';
+    priceInput.dispatchEvent(new Event('input'));
+    await fixture.whenStable();
+
+    form.dispatchEvent(new Event('submit'));
+
+    const createReq = controller.expectOne(`${apiUrl}/products`);
+    expect(createReq.request.method).toBe('POST');
+    createReq.flush(
+      { statusCode: 401, message: 'Unauthorized' },
+      { status: 401, statusText: 'Unauthorized' },
+    );
+    await fixture.whenStable();
+
+    expect(auth.isAuthenticated()).toBe(false);
+    expect(idle.expired()).toBe(true);
+    expect(navigate).toHaveBeenCalledWith('/login');
+    expect(el.textContent).not.toContain('Novo Café');
+    expect(el.textContent).not.toContain('Não foi possível conectar. Tente novamente.');
+    expect(el.querySelector<HTMLButtonElement>('[data-testid="submit-product"]')?.disabled).toBe(
+      false,
+    );
+
+    controller.verify();
+    sessionStorage.clear();
   });
 });

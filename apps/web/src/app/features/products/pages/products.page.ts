@@ -1,3 +1,4 @@
+import { HttpErrorResponse } from '@angular/common/http';
 import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Product, ProductsService } from '../data/products.service';
@@ -38,6 +39,7 @@ export class ProductsPage implements OnInit {
   protected readonly submitted = signal(false);
   protected readonly saving = signal(false);
   protected readonly submitError = signal<string | null>(null);
+  protected readonly barcodeConflictError = signal<string | null>(null);
 
   protected readonly nameError = computed(() =>
     this.name().trim() === '' ? 'Informe o nome do produto.' : null,
@@ -85,9 +87,10 @@ export class ProductsPage implements OnInit {
         this.listError.set(null);
         this.loading.set(false);
       },
-      error: () => {
-        this.listError.set('Não foi possível conectar. Tente novamente.');
+      error: (err: unknown) => {
         this.loading.set(false);
+        if (err instanceof HttpErrorResponse && err.status === 401) return;
+        this.listError.set('Não foi possível conectar. Tente novamente.');
       },
     });
   }
@@ -106,6 +109,13 @@ export class ProductsPage implements OnInit {
     this.modalOpen.set(false);
   }
 
+  protected onBarcodeChange(value: string): void {
+    this.barcode.set(value);
+    if (this.barcodeConflictError()) {
+      this.barcodeConflictError.set(null);
+    }
+  }
+
   protected submit(): void {
     if (this.saving()) return;
     this.submitted.set(true);
@@ -116,6 +126,7 @@ export class ProductsPage implements OnInit {
     if (priceCents === null || priceCents <= 0) return;
 
     this.submitError.set(null);
+    this.barcodeConflictError.set(null);
     this.saving.set(true);
 
     this.productsService
@@ -132,9 +143,24 @@ export class ProductsPage implements OnInit {
           this.saving.set(false);
           this.closeModal();
         },
-        error: () => {
+        error: (err: unknown) => {
           this.saving.set(false);
-          this.submitError.set('Não foi possível cadastrar o produto. Tente novamente.');
+          if (err instanceof HttpErrorResponse) {
+            if (err.status === 401) {
+              return;
+            }
+            if (err.status === 409) {
+              const apiMessage = (err.error as { message?: unknown } | null)?.message;
+              this.barcodeConflictError.set(
+                typeof apiMessage === 'string'
+                  ? apiMessage
+                  : 'Já existe um produto com este código de barras.',
+              );
+              this.submitError.set(null);
+              return;
+            }
+          }
+          this.submitError.set('Não foi possível conectar. Tente novamente.');
         },
       });
   }
@@ -146,5 +172,6 @@ export class ProductsPage implements OnInit {
     this.submitted.set(false);
     this.saving.set(false);
     this.submitError.set(null);
+    this.barcodeConflictError.set(null);
   }
 }

@@ -228,7 +228,7 @@
               <label for="product-barcode" class="text-corpo-destaque text-texto">
                 Código de barras EAN-13 <span class="text-perigo">*</span>
               </label>
-              @if (barcodeValid()) {
+              @if (barcodeValid() && !barcodeConflictError()) {
                 <span
                   class="inline-flex items-center gap-xs rounded-full bg-sucesso/10 px-sm py-xs text-legenda font-semibold text-sucesso"
                 >
@@ -245,13 +245,23 @@
               data-testid="input-product-barcode"
               placeholder="0000000000000"
               [ngModel]="barcode()"
-              (ngModelChange)="barcode.set($event)"
-              class="rounded-xl border px-md py-sm font-mono text-corpo text-texto placeholder:text-texto-suave focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primaria"
-              [class.border-perigo]="submitted() && barcodeError()"
-              [class.border-desabilitado]="!(submitted() && barcodeError())"
+              (ngModelChange)="onBarcodeChange($event)"
+              class="rounded-xl px-md py-sm font-mono text-corpo text-texto placeholder:text-texto-suave focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primaria"
+              [class.border]="!(barcodeConflictError() || (submitted() && barcodeError()))"
+              [class.border-2]="barcodeConflictError() || (submitted() && barcodeError())"
+              [class.border-perigo]="barcodeConflictError() || (submitted() && barcodeError())"
+              [class.border-desabilitado]="!(barcodeConflictError() || (submitted() && barcodeError()))"
             />
-            @if (submitted() && barcodeError(); as message) {
-              <p class="text-legenda text-perigo" role="alert">{{ message }}</p>
+            @if (barcodeConflictError(); as message) {
+              <p class="inline-flex items-center gap-xs text-legenda text-perigo" role="alert">
+                <span class="material-symbols-outlined text-[16px]" aria-hidden="true">error</span>
+                <span>{{ message }}</span>
+              </p>
+            } @else if (submitted() && barcodeError(); as message) {
+              <p class="inline-flex items-center gap-xs text-legenda text-perigo" role="alert">
+                <span class="material-symbols-outlined text-[16px]" aria-hidden="true">error</span>
+                <span>{{ message }}</span>
+              </p>
             }
           </div>
 

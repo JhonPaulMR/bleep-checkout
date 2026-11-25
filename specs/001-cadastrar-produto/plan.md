@@ -35,7 +35,7 @@
   - Teste primeiro: testes unitários em `products.page.spec.ts` verificando abertura/fechamento do modal pelo botão `+ Novo Produto` e `Cancelar` sem chamar `ProductsService.create`, bloqueio de envio com mensagens de erro por campo (nome vazio, EAN-13 inválido, preço vazio/zero/negativo), e envio válido chamando `ProductsService.create` com `priceCents` correto, atualizando a tabela e fechando o modal; falham porque o modal ainda não existe
   - Arquivos previstos: `apps/web/src/app/features/products/pages/products.page.ts`, `apps/web/src/app/features/products/pages/products.page.html`, `apps/web/src/app/features/products/pages/products.page.spec.ts`
 
-- [ ] **Tarefa 5 — Tratar conflito `409`, sessão expirada `401` e falha de rede na tela de Produtos**
+- [x] **Tarefa 5 — Tratar conflito `409`, sessão expirada `401` e falha de rede na tela de Produtos**
   - Cobre: CA2 (lado do front), CA7, CA8
   - Teste primeiro: testes unitários em `products.page.spec.ts` verificando que `409` destaca o campo de código de barras com erro e exibe "Já existe um produto com este código de barras." mantendo os dados preenchidos, erro de rede exibe "Não foi possível conectar. Tente novamente." mantendo os campos e saindo do carregamento (tanto na listagem quanto no cadastro), e `401` dispara o fluxo do `authInterceptor` sem criar produto; falham porque esses tratamentos ainda não existem
   - Arquivos previstos: `apps/web/src/app/features/products/pages/products.page.ts`, `apps/web/src/app/features/products/pages/products.page.html`, `apps/web/src/app/features/products/pages/products.page.spec.ts`
