@@ -67,7 +67,7 @@ Essas relações representam o núcleo do domínio sem definir banco, endpoints 
 
 ## 📝 4. Escopo Funcional (User Stories)
 
-### US01 — Cadastrar produto · `Must Have` · `M` · Status: `🟡 Ready`
+### US01 — Cadastrar produto · `Must Have` · `M` · Status: `🟢 Live`
 
 **Como** gerente, **eu quero** cadastrar um produto com suas informações comerciais **para que** ele possa ser encontrado e vendido no simulador de caixa.
 
@@ -297,3 +297,4 @@ Essas relações representam o núcleo do domínio sem definir banco, endpoints 
 | 08/10/2026 | 1.1.0 | Atores gerente e operador de caixa; US01 e US02 passam ao gerente; CPF único em US02; novas US09–US13 (Draft); RN13–RN18; venda PIX pendente não expira; fora de escopo ampliado. |
 | 07/11/2026 | 1.1.1 | US09 (Entrar no sistema) passa a 🟢 Live, implementada na Issue #10. |
 | 24/11/2026 | 1.1.2 | US06 (Pagar via PIX — integrada ao Mercado Pago Checkout Transparente com Cartão e PIX) passa a 🟢 Live, implementada na Issue #3. |
+| 25/11/2026 | 1.1.3 | US01 (Cadastrar produto — API `POST/GET /products` e tela de Produtos fiel ao protótipo) passa a 🟢 Live, implementada na Issue #1. |
