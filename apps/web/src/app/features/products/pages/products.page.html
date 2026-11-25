@@ -11,6 +11,7 @@
       <button
         type="button"
         data-testid="open-new-product-modal"
+        (click)="openModal()"
         class="inline-flex items-center justify-center gap-xs rounded-xl bg-primaria px-lg py-sm text-corpo-destaque text-superficie shadow-sm transition-colors hover:brightness-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primaria"
       >
         <span class="material-symbols-outlined text-[20px]" aria-hidden="true">add</span>
@@ -168,4 +169,159 @@
       }
     </section>
   </div>
+
+  @if (modalOpen()) {
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="product-modal-title"
+      data-testid="product-modal"
+      class="fixed inset-0 z-50 flex items-center justify-center bg-texto/40 p-md backdrop-blur-sm"
+    >
+      <div
+        class="w-full max-w-lg rounded-2xl border border-desabilitado/60 bg-superficie p-lg shadow-xl"
+      >
+        <div class="mb-lg flex items-start justify-between gap-md">
+          <div>
+            <h2 id="product-modal-title" class="text-titulo-secao text-texto">
+              Cadastrar Novo Produto
+            </h2>
+            <p class="mt-xs text-legenda text-texto-suave">
+              Preencha os dados essenciais para habilitar o item no caixa
+            </p>
+          </div>
+          <button
+            type="button"
+            aria-label="Fechar modal"
+            data-testid="close-product-modal"
+            (click)="closeModal()"
+            class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-texto-suave transition-colors hover:bg-fundo hover:text-texto focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primaria"
+          >
+            <span class="material-symbols-outlined text-[20px]" aria-hidden="true">close</span>
+          </button>
+        </div>
+
+        <form novalidate class="flex flex-col gap-md" (ngSubmit)="submit()">
+          <div class="flex flex-col gap-xs">
+            <label for="product-name" class="text-corpo-destaque text-texto">
+              Nome do Produto <span class="text-perigo">*</span>
+            </label>
+            <input
+              id="product-name"
+              type="text"
+              name="productName"
+              data-testid="input-product-name"
+              placeholder="Ex.: Café Torrado 500g"
+              [ngModel]="name()"
+              (ngModelChange)="name.set($event)"
+              class="rounded-xl border px-md py-sm text-corpo text-texto placeholder:text-texto-suave focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primaria"
+              [class.border-perigo]="submitted() && nameError()"
+              [class.border-desabilitado]="!(submitted() && nameError())"
+            />
+            @if (submitted() && nameError(); as message) {
+              <p class="text-legenda text-perigo" role="alert">{{ message }}</p>
+            }
+          </div>
+
+          <div class="flex flex-col gap-xs">
+            <div class="flex items-center justify-between gap-sm">
+              <label for="product-barcode" class="text-corpo-destaque text-texto">
+                Código de barras EAN-13 <span class="text-perigo">*</span>
+              </label>
+              @if (barcodeValid()) {
+                <span
+                  class="inline-flex items-center gap-xs rounded-full bg-sucesso/10 px-sm py-xs text-legenda font-semibold text-sucesso"
+                >
+                  EAN válido
+                </span>
+              }
+            </div>
+            <input
+              id="product-barcode"
+              type="text"
+              name="productBarcode"
+              maxlength="13"
+              inputmode="numeric"
+              data-testid="input-product-barcode"
+              placeholder="0000000000000"
+              [ngModel]="barcode()"
+              (ngModelChange)="barcode.set($event)"
+              class="rounded-xl border px-md py-sm font-mono text-corpo text-texto placeholder:text-texto-suave focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primaria"
+              [class.border-perigo]="submitted() && barcodeError()"
+              [class.border-desabilitado]="!(submitted() && barcodeError())"
+            />
+            @if (submitted() && barcodeError(); as message) {
+              <p class="text-legenda text-perigo" role="alert">{{ message }}</p>
+            }
+          </div>
+
+          <div class="flex flex-col gap-xs">
+            <label for="product-price" class="text-corpo-destaque text-texto">
+              Preço unitário (R$) <span class="text-perigo">*</span>
+            </label>
+            <div
+              class="flex items-center rounded-xl border bg-superficie focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-primaria"
+              [class.border-perigo]="submitted() && priceError()"
+              [class.border-desabilitado]="!(submitted() && priceError())"
+            >
+              <span class="pl-md text-corpo text-texto-suave">R$</span>
+              <input
+                id="product-price"
+                type="text"
+                name="productPrice"
+                inputmode="decimal"
+                data-testid="input-product-price"
+                placeholder="0,00"
+                [ngModel]="price()"
+                (ngModelChange)="price.set($event)"
+                class="w-full bg-transparent px-sm py-sm text-corpo text-texto placeholder:text-texto-suave focus-visible:outline-none"
+              />
+            </div>
+            @if (submitted() && priceError(); as message) {
+              <p class="text-legenda text-perigo" role="alert">{{ message }}</p>
+            }
+          </div>
+
+          <div
+            class="flex items-start gap-sm rounded-xl border border-desabilitado/60 bg-fundo p-sm text-legenda text-texto-suave"
+          >
+            <span class="material-symbols-outlined text-[18px] text-primaria" aria-hidden="true">
+              info
+            </span>
+            <p>
+              O produto só aparece no caixa depois que o cadastro é concluído com todos os campos
+              válidos.
+            </p>
+          </div>
+
+          @if (submitError(); as message) {
+            <p class="text-legenda text-perigo" role="alert">{{ message }}</p>
+          }
+
+          <div class="mt-sm flex items-center justify-end gap-sm">
+            <button
+              type="button"
+              data-testid="cancel-product-modal"
+              (click)="closeModal()"
+              class="rounded-xl border border-desabilitado px-lg py-sm text-corpo-destaque text-texto transition-colors hover:bg-fundo focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primaria"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              data-testid="submit-product"
+              [disabled]="saving()"
+              class="rounded-xl bg-primaria px-lg py-sm text-corpo-destaque text-superficie shadow-sm transition-colors hover:brightness-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primaria disabled:cursor-not-allowed disabled:bg-desabilitado"
+            >
+              @if (saving()) {
+                Salvando...
+              } @else {
+                Salvar Produto
+              }
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  }
 </main>

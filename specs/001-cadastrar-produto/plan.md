@@ -30,7 +30,7 @@
   - Teste primeiro: testes unitários em `products.page.spec.ts` verificando renderização da tabela de produtos com preço formatado em R$ e status `Disponível`, cards de resumo com contagem real, filtro local por nome e código de barras, estado vazio quando não há produtos ou quando a busca não encontra correspondência, e botões Editar/Desativar desabilitados (`// TODO #14`); falham porque `ProductsPage` é apenas um placeholder
   - Arquivos previstos: `apps/web/src/app/features/products/pages/products.page.ts`, `apps/web/src/app/features/products/pages/products.page.html`, `apps/web/src/app/features/products/pages/products.page.spec.ts`
 
-- [ ] **Tarefa 4 — Implementar modal "+ Novo Produto" com validação inline, envio e cancelamento sem persistir**
+- [x] **Tarefa 4 — Implementar modal "+ Novo Produto" com validação inline, envio e cancelamento sem persistir**
   - Cobre: CA1 (cadastro pela interface), CA3 (validação no formulário), CA9 (abandono/cancelamento sem persistir)
   - Teste primeiro: testes unitários em `products.page.spec.ts` verificando abertura/fechamento do modal pelo botão `+ Novo Produto` e `Cancelar` sem chamar `ProductsService.create`, bloqueio de envio com mensagens de erro por campo (nome vazio, EAN-13 inválido, preço vazio/zero/negativo), e envio válido chamando `ProductsService.create` com `priceCents` correto, atualizando a tabela e fechando o modal; falham porque o modal ainda não existe
   - Arquivos previstos: `apps/web/src/app/features/products/pages/products.page.ts`, `apps/web/src/app/features/products/pages/products.page.html`, `apps/web/src/app/features/products/pages/products.page.spec.ts`
