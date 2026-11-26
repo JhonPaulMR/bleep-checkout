@@ -10,6 +10,7 @@ import { API_URL } from '../../../core/config/api-url';
 import {
   CheckoutCustomer,
   CheckoutService,
+  CustomerCreditPaymentResult,
   PaymentResponse,
   Product,
   Sale,
@@ -39,6 +40,7 @@ describe('CheckoutPage', () => {
   let getPaymentConfigSpy: ReturnType<typeof vi.fn>;
   let payWithCardSpy: ReturnType<typeof vi.fn>;
   let payWithPixSpy: ReturnType<typeof vi.fn>;
+  let payWithCustomerCreditSpy: ReturnType<typeof vi.fn>;
 
   let brickCreateSpy: ReturnType<typeof vi.fn>;
   let brickUnmountSpy: ReturnType<typeof vi.fn<() => void>>;
@@ -146,6 +148,7 @@ describe('CheckoutPage', () => {
     getPaymentConfigSpy = vi.fn().mockReturnValue(of({ publicKey: 'TEST-public-key-123' }));
     payWithCardSpy = vi.fn();
     payWithPixSpy = vi.fn();
+    payWithCustomerCreditSpy = vi.fn();
 
     TestBed.configureTestingModule({
       imports: [CheckoutPage],
@@ -161,6 +164,7 @@ describe('CheckoutPage', () => {
             getPaymentConfig: getPaymentConfigSpy,
             payWithCard: payWithCardSpy,
             payWithPix: payWithPixSpy,
+            payWithCustomerCredit: payWithCustomerCreditSpy,
           },
         },
       ],
@@ -1274,5 +1278,302 @@ describe('CheckoutPage', () => {
     expect(listCustomersSpy).toHaveBeenCalledTimes(2);
     expect(el.querySelector('[data-testid="customer-modal-error"]')).toBeNull();
     expect(el.querySelector('[data-testid="customer-modal"]')?.textContent).toContain('Ana Clara');
+  });
+
+  it('US05 CA4: mantém botão Ir para pagamento desabilitado com carrinho vazio', () => {
+    const fixture = setup();
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+
+    const proceedButton = el.querySelector<HTMLButtonElement>('[data-testid="proceed-payment"]')!;
+    expect(proceedButton.disabled).toBe(true);
+  });
+
+  it('US05 CA3: selecionar Crédito do cliente sem cliente identificado exibe aviso e não permite debitar', async () => {
+    const fixture = setup();
+    const el = await addFirstProductAndProceed(fixture);
+
+    const creditTab = el.querySelector<HTMLButtonElement>('[data-testid="select-method-customer-credit"]')!;
+    creditTab.click();
+    fixture.detectChanges();
+
+    expect(el.textContent).toContain('Selecione um cliente para pagar com crédito.');
+    const confirmBtn = el.querySelector<HTMLButtonElement>('[data-testid="confirm-customer-credit"]');
+    expect(confirmBtn === null || confirmBtn.disabled).toBe(true);
+    expect(payWithCustomerCreditSpy).not.toHaveBeenCalled();
+  });
+
+  it('US05 CA2: com saldo insuficiente exibe aviso de erro e mantém botão de débito desabilitado', async () => {
+    const fixture = setup();
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+
+    const lowBalanceCustomer: CheckoutCustomer = {
+      id: 'cust-low',
+      name: 'Carlos Souza',
+      cpf: '11122233344',
+      balanceCents: 1000,
+    };
+    listCustomersSpy.mockReturnValue(of([lowBalanceCustomer]));
+    createSaleSpy.mockReturnValue(
+      of({
+        ...openSale,
+        totalCents: 2500,
+        customerId: lowBalanceCustomer.id,
+        customer: lowBalanceCustomer,
+      }),
+    );
+
+    el.querySelector<HTMLButtonElement>('[data-testid="identify-customer-btn"]')!.click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+    el.querySelector<HTMLButtonElement>('[data-testid="select-customer-cust-low"]')!.click();
+    fixture.detectChanges();
+
+    await addFirstProductAndProceed(fixture);
+
+    el.querySelector<HTMLButtonElement>('[data-testid="select-method-customer-credit"]')!.click();
+    fixture.detectChanges();
+
+    expect(el.textContent).toContain('Carlos Souza');
+    expect(el.textContent).toContain('111.222.333-44');
+    expect(el.textContent).toContain('10,00');
+    expect(el.textContent).toContain('25,00');
+    const insufficientEl = el.querySelector('[data-testid="credit-insufficient-balance"]');
+    expect(insufficientEl?.textContent).toContain('Saldo insuficiente — o saldo não será alterado');
+    const confirmBtn = el.querySelector<HTMLButtonElement>('[data-testid="confirm-customer-credit"]')!;
+    expect(confirmBtn.disabled).toBe(true);
+
+    confirmBtn.click();
+    fixture.detectChanges();
+    expect(payWithCustomerCreditSpy).not.toHaveBeenCalled();
+  });
+
+  it('US05 CA1: com saldo suficiente exibe prévia de saldo restante, debita via API e conclui venda em COMPLETED', async () => {
+    const fixture = setup();
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+
+    const richCustomer = sampleCustomers[0]; // 15000 cents
+    createSaleSpy.mockReturnValue(
+      of({
+        ...openSale,
+        totalCents: 2500,
+        customerId: richCustomer.id,
+        customer: richCustomer,
+      }),
+    );
+
+    const creditResult: CustomerCreditPaymentResult = {
+      sale: {
+        ...openSale,
+        status: 'COMPLETED',
+        completedAt: '2026-11-26T16:00:00.000Z',
+        customerId: richCustomer.id,
+        customer: { ...richCustomer, balanceCents: 12500 },
+      },
+      payment: {
+        id: 'pay-credit-1',
+        saleId: 'sale-1',
+        method: 'CUSTOMER_CREDIT',
+        status: 'APPROVED',
+        amountCents: 2500,
+        gatewayPaymentId: null,
+        qrCode: null,
+        qrCodeBase64: null,
+        createdAt: '2026-11-26T16:00:00.000Z',
+      },
+      customerBalanceCents: 12500,
+    };
+    payWithCustomerCreditSpy.mockReturnValue(of(creditResult));
+
+    el.querySelector<HTMLButtonElement>('[data-testid="identify-customer-btn"]')!.click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+    el.querySelector<HTMLButtonElement>('[data-testid="select-customer-cust-1"]')!.click();
+    fixture.detectChanges();
+
+    await addFirstProductAndProceed(fixture);
+
+    el.querySelector<HTMLButtonElement>('[data-testid="select-method-customer-credit"]')!.click();
+    fixture.detectChanges();
+
+    expect(el.textContent).toContain('Ana Clara');
+    expect(el.textContent).toContain('123.456.789-01');
+    expect(el.textContent).toContain('150,00');
+    expect(el.textContent).toContain('25,00');
+    expect(el.textContent).toContain('125,00');
+
+    const confirmBtn = el.querySelector<HTMLButtonElement>('[data-testid="confirm-customer-credit"]')!;
+    expect(confirmBtn.disabled).toBe(false);
+    expect(confirmBtn.textContent).toContain('Debitar');
+    expect(confirmBtn.textContent).toContain('25,00');
+    expect(confirmBtn.textContent).toContain('do crédito');
+
+    confirmBtn.click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(payWithCustomerCreditSpy).toHaveBeenCalledTimes(1);
+    expect(payWithCustomerCreditSpy).toHaveBeenCalledWith('sale-1');
+    expect(el.textContent).toContain('Venda concluída');
+    expect(el.textContent).toContain('Crédito do cliente');
+    expect(el.querySelector('[data-testid="completed-customer-balance"]')?.textContent).toContain('125,00');
+  });
+
+  it('US05 CA8: alternar de Crédito do cliente para Cartão ou PIX sem confirmar não chama payWithCustomerCredit', async () => {
+    const fixture = setup();
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+
+    const richCustomer = sampleCustomers[0];
+    createSaleSpy.mockReturnValue(
+      of({
+        ...openSale,
+        totalCents: 2500,
+        customerId: richCustomer.id,
+        customer: richCustomer,
+      }),
+    );
+
+    el.querySelector<HTMLButtonElement>('[data-testid="identify-customer-btn"]')!.click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+    el.querySelector<HTMLButtonElement>('[data-testid="select-customer-cust-1"]')!.click();
+    fixture.detectChanges();
+
+    await addFirstProductAndProceed(fixture);
+
+    el.querySelector<HTMLButtonElement>('[data-testid="select-method-customer-credit"]')!.click();
+    fixture.detectChanges();
+    el.querySelector<HTMLButtonElement>('[data-testid="select-method-pix"]')!.click();
+    fixture.detectChanges();
+    el.querySelector<HTMLButtonElement>('[data-testid="select-method-card"]')!.click();
+    fixture.detectChanges();
+    await flushMicrotasks();
+
+    expect(payWithCustomerCreditSpy).not.toHaveBeenCalled();
+  });
+
+  it('US05 CA7: erro de rede em payWithCustomerCredit mantém venda OPEN, reabilita botão e exibe mensagem amigável', async () => {
+    const fixture = setup();
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+
+    const richCustomer = sampleCustomers[0];
+    createSaleSpy.mockReturnValue(
+      of({
+        ...openSale,
+        totalCents: 2500,
+        customerId: richCustomer.id,
+        customer: richCustomer,
+      }),
+    );
+    payWithCustomerCreditSpy.mockReturnValue(
+      throwError(() => new HttpErrorResponse({ status: 0, statusText: 'Unknown Error' })),
+    );
+
+    el.querySelector<HTMLButtonElement>('[data-testid="identify-customer-btn"]')!.click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+    el.querySelector<HTMLButtonElement>('[data-testid="select-customer-cust-1"]')!.click();
+    fixture.detectChanges();
+
+    await addFirstProductAndProceed(fixture);
+
+    el.querySelector<HTMLButtonElement>('[data-testid="select-method-customer-credit"]')!.click();
+    fixture.detectChanges();
+
+    const confirmBtn = el.querySelector<HTMLButtonElement>('[data-testid="confirm-customer-credit"]')!;
+    confirmBtn.click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(el.querySelector('[data-testid="sale-status-badge"]')?.textContent).toContain('Venda aberta');
+    expect(el.textContent).toContain('Não foi possível conectar. Tente novamente.');
+    expect(
+      el.querySelector<HTMLButtonElement>('[data-testid="confirm-customer-credit"]')!.disabled,
+    ).toBe(false);
+  });
+
+  it('US05 CA7: 401 em POST /sales/:id/payments/credit dispara authInterceptor, limpa sessão e redireciona para /login', async () => {
+    sessionStorage.clear();
+    TestBed.configureTestingModule({
+      imports: [CheckoutPage],
+      providers: [
+        provideRouter([]),
+        provideHttpClient(withInterceptors([authInterceptor])),
+        provideHttpClientTesting(),
+      ],
+    });
+
+    const controller = TestBed.inject(HttpTestingController);
+    const auth = TestBed.inject(AuthService);
+    const idle = TestBed.inject(IdleSessionService);
+    const apiUrl = TestBed.inject(API_URL);
+    const navigate = vi.spyOn(TestBed.inject(Router), 'navigateByUrl').mockResolvedValue(true);
+
+    auth.startSession('expired-token', { name: 'Operador', role: 'OPERATOR' });
+
+    const fixture = TestBed.createComponent(CheckoutPage);
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+
+    // Adiciona produto por código de barras
+    setBarcodeInput(el, '7890000000001');
+    fixture.detectChanges();
+    el.querySelector<HTMLButtonElement>('[data-testid="add-by-barcode"]')!.click();
+    controller.expectOne(`${apiUrl}/products/barcode/7890000000001`).flush({ data: sampleProducts[0] });
+    fixture.detectChanges();
+
+    // Seleciona cliente
+    el.querySelector<HTMLButtonElement>('[data-testid="identify-customer-btn"]')!.click();
+    controller.expectOne(`${apiUrl}/customers`).flush({ data: sampleCustomers });
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+    el.querySelector<HTMLButtonElement>('[data-testid="select-customer-cust-1"]')!.click();
+    fixture.detectChanges();
+
+    // Cria venda
+    el.querySelector<HTMLButtonElement>('[data-testid="proceed-payment"]')!.click();
+    const saleWithCustomer: Sale = {
+      ...openSale,
+      totalCents: 1250,
+      customerId: 'cust-1',
+      customer: sampleCustomers[0],
+    };
+    controller.expectOne(`${apiUrl}/sales`).flush({ data: saleWithCustomer });
+    fixture.detectChanges();
+
+    // Troca para Crédito do cliente (cancela getPaymentConfig se houver, ou responde antes)
+    const configReqs = controller.match(`${apiUrl}/payments/config`);
+    configReqs.forEach((r) => r.flush({ data: { publicKey: 'TEST-pk' } }));
+    el.querySelector<HTMLButtonElement>('[data-testid="select-method-customer-credit"]')!.click();
+    fixture.detectChanges();
+
+    // Confirma débito e recebe 401
+    el.querySelector<HTMLButtonElement>('[data-testid="confirm-customer-credit"]')!.click();
+    const creditReq = controller.expectOne(`${apiUrl}/sales/sale-1/payments/credit`);
+    expect(creditReq.request.method).toBe('POST');
+    creditReq.flush(
+      { statusCode: 401, message: 'Unauthorized' },
+      { status: 401, statusText: 'Unauthorized' },
+    );
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(auth.isAuthenticated()).toBe(false);
+    expect(idle.expired()).toBe(true);
+    expect(navigate).toHaveBeenCalledWith('/login');
+
+    controller.verify();
+    sessionStorage.clear();
   });
 });

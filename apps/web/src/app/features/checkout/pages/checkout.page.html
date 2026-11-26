@@ -486,9 +486,20 @@
         @if (currentSale.status === 'COMPLETED') {
           <div class="flex flex-col gap-md rounded-md border border-sucesso p-md">
             <p class="text-titulo-secao text-sucesso">Venda concluída — pagamento confirmado!</p>
-            <p class="text-corpo text-texto">
-              O pagamento da venda #{{ currentSale.number }} foi confirmado pelo gateway.
-            </p>
+            @if (lastPayment()?.method === 'CUSTOMER_CREDIT') {
+              <p class="text-corpo text-texto">
+                O pagamento da venda #{{ currentSale.number }} foi confirmado via Crédito do cliente.
+              </p>
+              @if (completedCustomerBalanceCents() !== null) {
+                <p data-testid="completed-customer-balance" class="text-corpo-destaque text-sucesso">
+                  Saldo restante do cliente: {{ formatCents(completedCustomerBalanceCents()!) }}
+                </p>
+              }
+            } @else {
+              <p class="text-corpo text-texto">
+                O pagamento da venda #{{ currentSale.number }} foi confirmado pelo gateway.
+              </p>
+            }
             <div>
               <button
                 type="button"
@@ -599,6 +610,23 @@
             >
               PIX
             </button>
+
+            <button
+              type="button"
+              data-testid="select-method-customer-credit"
+              class="rounded-md px-md py-sm text-corpo-destaque focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primaria disabled:bg-desabilitado"
+              [class.bg-primaria]="selectedMethod() === 'CUSTOMER_CREDIT'"
+              [class.text-superficie]="selectedMethod() === 'CUSTOMER_CREDIT'"
+              [class.hover:brightness-90]="selectedMethod() === 'CUSTOMER_CREDIT'"
+              [class.border]="selectedMethod() !== 'CUSTOMER_CREDIT'"
+              [class.border-primaria]="selectedMethod() !== 'CUSTOMER_CREDIT'"
+              [class.text-primaria]="selectedMethod() !== 'CUSTOMER_CREDIT'"
+              [class.hover:bg-fundo]="selectedMethod() !== 'CUSTOMER_CREDIT'"
+              [disabled]="submittingPayment()"
+              (click)="selectPaymentMethod('CUSTOMER_CREDIT')"
+            >
+              Crédito do cliente
+            </button>
           </div>
 
           @if (declinedMessage(); as message) {
@@ -631,7 +659,7 @@
               }
               <div id="card-payment-brick-container"></div>
             </div>
-          } @else {
+          } @else if (selectedMethod() === 'PIX') {
             <div class="flex flex-col gap-md">
               <p class="text-corpo text-texto-suave">
                 Gere o QR Code PIX para o valor de {{ formatCents(currentSale.totalCents) }}.
@@ -652,6 +680,90 @@
                 </button>
               </div>
             </div>
+          } @else {
+            @if (activeSaleCustomer(); as customer) {
+              <div class="flex flex-col gap-md rounded-md border border-desabilitado bg-fundo p-md">
+                <div class="flex flex-wrap items-center justify-between gap-sm">
+                  <div>
+                    <p class="text-corpo-destaque text-texto">{{ customer.name }}</p>
+                    <p class="text-legenda text-texto-suave">CPF: {{ formatCpf(customer.cpf) }}</p>
+                  </div>
+                  <div class="text-right">
+                    <p class="text-legenda text-texto-suave">Saldo atual</p>
+                    <p class="text-corpo-destaque text-texto">
+                      {{ formatCents(customer.balanceCents) }}
+                    </p>
+                  </div>
+                </div>
+
+                @if (customer.balanceCents < currentSale.totalCents) {
+                  <div class="flex items-center justify-between border-t border-desabilitado pt-sm">
+                    <span class="text-corpo text-texto-suave">Valor da venda</span>
+                    <span class="text-corpo-destaque text-texto">
+                      {{ formatCents(currentSale.totalCents) }}
+                    </span>
+                  </div>
+
+                  <p
+                    role="alert"
+                    data-testid="credit-insufficient-balance"
+                    class="rounded-md border border-perigo bg-perigo/10 px-md py-sm text-corpo-destaque text-perigo"
+                  >
+                    Saldo insuficiente — o saldo não será alterado
+                  </p>
+
+                  <div>
+                    <button
+                      type="button"
+                      data-testid="confirm-customer-credit"
+                      class="rounded-md bg-primaria px-md py-sm text-corpo-destaque text-superficie hover:brightness-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primaria disabled:bg-desabilitado disabled:text-texto-suave"
+                      disabled
+                    >
+                      Debitar {{ formatCents(currentSale.totalCents) }} do crédito
+                    </button>
+                  </div>
+                } @else {
+                  <div class="flex flex-col gap-xs border-t border-desabilitado pt-sm">
+                    <div class="flex items-center justify-between">
+                      <span class="text-corpo text-texto-suave">Valor a debitar</span>
+                      <span class="text-corpo-destaque text-texto">
+                        {{ formatCents(currentSale.totalCents) }}
+                      </span>
+                    </div>
+                    <div class="flex items-center justify-between">
+                      <span class="text-corpo text-texto-suave">Saldo restante</span>
+                      <span class="text-corpo-destaque text-sucesso">
+                        {{ formatCents(customer.balanceCents - currentSale.totalCents) }}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div>
+                    <button
+                      type="button"
+                      data-testid="confirm-customer-credit"
+                      class="rounded-md bg-primaria px-md py-sm text-corpo-destaque text-superficie hover:brightness-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primaria disabled:bg-desabilitado"
+                      [disabled]="submittingPayment()"
+                      (click)="submitCustomerCreditPayment()"
+                    >
+                      @if (submittingPayment()) {
+                        Processando...
+                      } @else {
+                        Debitar {{ formatCents(currentSale.totalCents) }} do crédito
+                      }
+                    </button>
+                  </div>
+                }
+              </div>
+            } @else {
+              <div
+                role="alert"
+                data-testid="credit-no-customer-warning"
+                class="rounded-md border border-alerta bg-alerta/10 p-md text-corpo text-alerta"
+              >
+                Selecione um cliente para pagar com crédito.
+              </div>
+            }
           }
         }
       </section>

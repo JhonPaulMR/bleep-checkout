@@ -29,7 +29,7 @@ const CARD_DECLINED_MESSAGE =
 const DEFAULT_PAYER_EMAIL = 'operador@bleep.local';
 const CARD_BRICK_CONTAINER_ID = 'card-payment-brick-container';
 
-type CheckoutPaymentMethod = 'CARD' | 'PIX';
+type CheckoutPaymentMethod = 'CARD' | 'PIX' | 'CUSTOMER_CREDIT';
 
 interface CartItem {
   product: Product;
@@ -164,6 +164,10 @@ export class CheckoutPage {
   protected readonly sale = signal<Sale | null>(null);
   protected readonly lastPayment = signal<Payment | null>(null);
   protected readonly selectedMethod = signal<CheckoutPaymentMethod>('CARD');
+  protected readonly completedCustomerBalanceCents = signal<number | null>(null);
+  protected readonly activeSaleCustomer = computed(
+    () => this.sale()?.customer ?? this.selectedCustomer(),
+  );
 
   protected readonly brickLoading = signal(false);
   protected readonly submittingPayment = signal(false);
@@ -448,6 +452,7 @@ export class CheckoutPage {
         this.creatingSale.set(false);
         this.sale.set(createdSale);
         this.lastPayment.set(null);
+        this.completedCustomerBalanceCents.set(null);
         this.paymentError.set(null);
         this.declinedMessage.set(null);
         this.selectedMethod.set('CARD');
@@ -511,6 +516,51 @@ export class CheckoutPage {
     });
   }
 
+  protected submitCustomerCreditPayment(): void {
+    const currentSale = this.sale();
+    const customer = this.activeSaleCustomer();
+    if (
+      !currentSale ||
+      currentSale.status !== 'OPEN' ||
+      !customer ||
+      customer.balanceCents < currentSale.totalCents ||
+      this.submittingPayment()
+    ) {
+      return;
+    }
+
+    this.paymentError.set(null);
+    this.declinedMessage.set(null);
+    this.submittingPayment.set(true);
+
+    this.checkoutService.payWithCustomerCredit(currentSale.id).subscribe({
+      next: (result) => {
+        this.submittingPayment.set(false);
+        this.sale.set(result.sale);
+        this.lastPayment.set(result.payment);
+        this.completedCustomerBalanceCents.set(result.customerBalanceCents);
+
+        const currentCustomer = this.selectedCustomer();
+        if (currentCustomer) {
+          this.selectedCustomer.set({
+            ...currentCustomer,
+            balanceCents: result.customerBalanceCents,
+          });
+        } else if (result.sale.customer) {
+          this.selectedCustomer.set({
+            ...result.sale.customer,
+            balanceCents: result.customerBalanceCents,
+          });
+        }
+      },
+      error: (err: unknown) => {
+        this.submittingPayment.set(false);
+        if (err instanceof HttpErrorResponse && err.status === 401) return;
+        this.paymentError.set(this.extractErrorMessage(err));
+      },
+    });
+  }
+
   protected copyPixCode(code: string): void {
     if (typeof navigator !== 'undefined' && navigator.clipboard) {
       void navigator.clipboard
@@ -540,6 +590,7 @@ export class CheckoutPage {
     this.declinedMessage.set(null);
     this.copiedPixCode.set(false);
     this.selectedMethod.set('CARD');
+    this.completedCustomerBalanceCents.set(null);
     this.selectedCustomer.set(null);
     this.customerModalOpen.set(false);
     this.customerSearchTerm.set('');
