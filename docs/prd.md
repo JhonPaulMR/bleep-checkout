@@ -93,7 +93,7 @@ Essas relações representam o núcleo do domínio sem definir banco, endpoints 
 
 **Regras relacionadas:** RN03, RN04, RN13, RN14
 
-### US03 — Montar venda no simulador de caixa · `Must Have` · `M` · Status: `🟡 Ready`
+### US03 — Montar venda no simulador de caixa · `Must Have` · `M` · Status: `🟢 Live`
 
 **Como** operador de caixa, **eu quero** localizar e adicionar produtos à venda usando código de barras, busca por nome ou leitor de código de barras **para que** eu consiga registrar a compra sem depender de uma única forma de entrada.
 
@@ -300,3 +300,4 @@ Essas relações representam o núcleo do domínio sem definir banco, endpoints 
 | 25/11/2026 | 1.1.3 | US01 (Cadastrar produto — API `POST/GET /products` e tela de Produtos fiel ao protótipo) passa a 🟢 Live, implementada na Issue #1. |
 | 25/11/2026 | 1.1.4 | US02 (Cadastrar cliente com crédito — migration `Customer`/`CreditTransaction`, API `POST/GET /customers` e tela de Clientes fiel ao protótipo) passa a 🟢 Live, implementada na Issue #2. |
 | 26/11/2026 | 1.1.5 | US12 (Adicionar crédito ao cliente — API `POST /customers/:id/credits` com transação `TOP_UP` e modal de recarga na tela de Clientes) passa a 🟢 Live, implementada na Issue #13. |
+| 26/11/2026 | 1.1.6 | US03 (Montar venda no simulador de caixa — `GET /products/barcode/:barcode`, `?search=` e PDV fiel a `caixa.html`/`busca.html`) passa a 🟢 Live, implementada na Issue #4. |
