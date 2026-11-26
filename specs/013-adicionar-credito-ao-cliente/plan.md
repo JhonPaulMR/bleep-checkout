@@ -12,7 +12,7 @@
 
 ## Tarefas
 
-- [ ] **Tarefa 1 — Implementar `POST /customers/:id/credits` na API com transação `TOP_UP` (unit + e2e)**
+- [x] **Tarefa 1 — Implementar `POST /customers/:id/credits` na API com transação `TOP_UP` (unit + e2e)**
   - Cobre: CA1 (lado da API), CA2 (lado da API), CA3, CA4, CA5
   - Teste primeiro: testes unitários em `customers.service.spec.ts` (incremento atômico de `balanceCents` + gravação de `CreditTransaction(TOP_UP)` na mesma `$transaction`; `NotFoundException` `"Cliente não encontrado."` quando cliente não existe) e testes e2e em `apps/api/test/customers.e2e-spec.ts` (`POST /customers/:id/credits` `201` para `MANAGER` somando exatamente o valor e gravando `CreditTransaction(TOP_UP)`; `400` para `0`, negativo, decimal ou campo extra sem alterar saldo; `403` para `OPERATOR` sem alterar saldo; `404` para `id` inexistente; `401` sem token/token inválido); falham porque DTO, método e rota ainda não existem
   - Arquivos previstos: `apps/api/src/modules/customers/dto/add-credit.dto.ts`, `apps/api/src/modules/customers/customers.service.ts`, `apps/api/src/modules/customers/customers.service.spec.ts`, `apps/api/src/modules/customers/customers.controller.ts`, `apps/api/test/customers.e2e-spec.ts`

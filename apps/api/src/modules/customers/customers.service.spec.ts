@@ -1,4 +1,4 @@
-import { ConflictException } from '@nestjs/common';
+import { ConflictException, NotFoundException } from '@nestjs/common';
 import { CreditType } from '../../../generated/prisma/enums.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { CustomersService } from './customers.service.js';
@@ -7,6 +7,8 @@ describe('CustomersService', () => {
   let tx: {
     customer: {
       create: ReturnType<typeof vi.fn>;
+      findUnique: ReturnType<typeof vi.fn>;
+      update: ReturnType<typeof vi.fn>;
     };
     creditTransaction: {
       create: ReturnType<typeof vi.fn>;
@@ -25,6 +27,8 @@ describe('CustomersService', () => {
     tx = {
       customer: {
         create: vi.fn(),
+        findUnique: vi.fn(),
+        update: vi.fn(),
       },
       creditTransaction: {
         create: vi.fn(),
@@ -184,6 +188,68 @@ describe('CustomersService', () => {
         orderBy: { name: 'asc' },
       });
       expect(result).toEqual(clientes);
+    });
+  });
+
+  describe('addCredit', () => {
+    it('incrementa balanceCents atomicamente e grava CreditTransaction TOP_UP na mesma transação', async () => {
+      const existingCustomer = {
+        id: 'cust-1',
+        name: 'Maria Clara',
+        cpf: '12345678901',
+        balanceCents: 5000,
+        createdAt: new Date('2026-11-25T19:00:00.000Z'),
+      };
+      const updatedCustomer = {
+        ...existingCustomer,
+        balanceCents: 7500,
+      };
+      tx.customer.findUnique.mockResolvedValue(existingCustomer);
+      tx.customer.update.mockResolvedValue(updatedCustomer);
+      tx.creditTransaction.create.mockResolvedValue({
+        id: 'tx-topup-1',
+        customerId: 'cust-1',
+        saleId: null,
+        type: CreditType.TOP_UP,
+        amountCents: 2500,
+        createdAt: new Date('2026-11-26T17:00:00.000Z'),
+      });
+
+      const result = await service.addCredit('cust-1', 2500);
+
+      expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+      expect(tx.customer.findUnique).toHaveBeenCalledWith({
+        where: { id: 'cust-1' },
+      });
+      expect(tx.customer.update).toHaveBeenCalledWith({
+        where: { id: 'cust-1' },
+        data: { balanceCents: { increment: 2500 } },
+      });
+      expect(tx.creditTransaction.create).toHaveBeenCalledWith({
+        data: {
+          customerId: 'cust-1',
+          type: CreditType.TOP_UP,
+          amountCents: 2500,
+        },
+      });
+      expect(result).toEqual(updatedCustomer);
+    });
+
+    it('lança NotFoundException quando cliente não existe sem atualizar saldo nem criar transação', async () => {
+      tx.customer.findUnique.mockResolvedValue(null);
+
+      const erro = await service
+        .addCredit('cust-inexistente', 2500)
+        .catch((e) => e);
+
+      expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+      expect(tx.customer.findUnique).toHaveBeenCalledWith({
+        where: { id: 'cust-inexistente' },
+      });
+      expect(erro).toBeInstanceOf(NotFoundException);
+      expect(erro.message).toBe('Cliente não encontrado.');
+      expect(tx.customer.update).not.toHaveBeenCalled();
+      expect(tx.creditTransaction.create).not.toHaveBeenCalled();
     });
   });
 });

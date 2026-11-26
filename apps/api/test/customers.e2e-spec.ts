@@ -320,4 +320,177 @@ describe('Clientes — POST /customers e GET /customers (e2e)', () => {
         .expect(401);
     });
   });
+
+  describe('POST /customers/:id/credits', () => {
+    it('201 para MANAGER soma exatamente amountCents ao balanceCents e grava CreditTransaction TOP_UP', async () => {
+      const managerToken = await login(
+        process.env.SEED_MANAGER_EMAIL!,
+        process.env.SEED_MANAGER_PASSWORD!,
+      );
+      const cpf = uniqueCpf(10);
+      createdCpfs.push(cpf);
+
+      const createResponse = await request(app.getHttpServer())
+        .post('/customers')
+        .set('Authorization', `Bearer ${managerToken}`)
+        .send({
+          name: 'Cliente Recarga',
+          cpf,
+          balanceCents: 3000,
+        })
+        .expect(201);
+
+      const customerId = createResponse.body.data.id as string;
+
+      const topUpResponse = await request(app.getHttpServer())
+        .post(`/customers/${customerId}/credits`)
+        .set('Authorization', `Bearer ${managerToken}`)
+        .send({ amountCents: 5000 })
+        .expect(201);
+
+      expect(topUpResponse.body.data).toEqual({
+        id: customerId,
+        name: 'Cliente Recarga',
+        cpf,
+        balanceCents: 8000,
+        createdAt: expect.any(String),
+      });
+
+      const customerInDb = await prisma.customer.findUnique({
+        where: { id: customerId },
+      });
+      expect(customerInDb?.balanceCents).toBe(8000);
+
+      const topUpTransactions = await prisma.creditTransaction.findMany({
+        where: { customerId, type: CreditType.TOP_UP },
+      });
+      expect(topUpTransactions).toHaveLength(1);
+      expect(topUpTransactions[0]).toMatchObject({
+        customerId,
+        saleId: null,
+        type: CreditType.TOP_UP,
+        amountCents: 5000,
+      });
+    });
+
+    it.each([
+      ['amountCents zero', { amountCents: 0 }],
+      ['amountCents negativo', { amountCents: -500 }],
+      ['amountCents decimal', { amountCents: 10.5 }],
+      ['amountCents ausente', {}],
+      ['campo extra não permitido', { amountCents: 1000, extraField: true }],
+    ])('400 para %s sem alterar balanceCents no banco', async (_caso, body) => {
+      const managerToken = await login(
+        process.env.SEED_MANAGER_EMAIL!,
+        process.env.SEED_MANAGER_PASSWORD!,
+      );
+      const cpf = uniqueCpf(11);
+      createdCpfs.push(cpf);
+
+      const createResponse = await request(app.getHttpServer())
+        .post('/customers')
+        .set('Authorization', `Bearer ${managerToken}`)
+        .send({
+          name: 'Cliente Validação',
+          cpf,
+          balanceCents: 2000,
+        })
+        .expect(201);
+
+      const customerId = createResponse.body.data.id as string;
+
+      const response = await request(app.getHttpServer())
+        .post(`/customers/${customerId}/credits`)
+        .set('Authorization', `Bearer ${managerToken}`)
+        .send(body)
+        .expect(400);
+
+      expect(response.body.statusCode).toBe(400);
+      expect(response.body.error).toBe('Bad Request');
+      expect(Array.isArray(response.body.message)).toBe(true);
+      expect(response.body.path).toBe(`/customers/${customerId}/credits`);
+
+      const customerInDb = await prisma.customer.findUnique({
+        where: { id: customerId },
+      });
+      expect(customerInDb?.balanceCents).toBe(2000);
+    });
+
+    it('403 para OPERATOR sem alterar balanceCents no banco', async () => {
+      const managerToken = await login(
+        process.env.SEED_MANAGER_EMAIL!,
+        process.env.SEED_MANAGER_PASSWORD!,
+      );
+      const operatorToken = await login(
+        process.env.SEED_OPERATOR_EMAIL!,
+        process.env.SEED_OPERATOR_PASSWORD!,
+      );
+      const cpf = uniqueCpf(12);
+      createdCpfs.push(cpf);
+
+      const createResponse = await request(app.getHttpServer())
+        .post('/customers')
+        .set('Authorization', `Bearer ${managerToken}`)
+        .send({
+          name: 'Cliente Operador Bloqueado',
+          cpf,
+          balanceCents: 4000,
+        })
+        .expect(201);
+
+      const customerId = createResponse.body.data.id as string;
+
+      const response = await request(app.getHttpServer())
+        .post(`/customers/${customerId}/credits`)
+        .set('Authorization', `Bearer ${operatorToken}`)
+        .send({ amountCents: 1500 })
+        .expect(403);
+
+      expect(response.body.statusCode).toBe(403);
+      expect(response.body.path).toBe(`/customers/${customerId}/credits`);
+
+      const customerInDb = await prisma.customer.findUnique({
+        where: { id: customerId },
+      });
+      expect(customerInDb?.balanceCents).toBe(4000);
+    });
+
+    it('404 para id inexistente com mensagem "Cliente não encontrado."', async () => {
+      const managerToken = await login(
+        process.env.SEED_MANAGER_EMAIL!,
+        process.env.SEED_MANAGER_PASSWORD!,
+      );
+      const missingId = '00000000-0000-0000-0000-000000000000';
+
+      const response = await request(app.getHttpServer())
+        .post(`/customers/${missingId}/credits`)
+        .set('Authorization', `Bearer ${managerToken}`)
+        .send({ amountCents: 1000 })
+        .expect(404);
+
+      expect(response.body.statusCode).toBe(404);
+      expect(response.body.message).toBe('Cliente não encontrado.');
+      expect(response.body.path).toBe(`/customers/${missingId}/credits`);
+    });
+
+    it('401 sem token e com token inválido', async () => {
+      const token = await login(
+        process.env.SEED_MANAGER_EMAIL!,
+        process.env.SEED_MANAGER_PASSWORD!,
+      );
+      const adulterado = `${token.slice(0, -1)}${token.endsWith('A') ? 'B' : 'A'}`;
+      const anyId = '00000000-0000-0000-0000-000000000000';
+
+      await request(app.getHttpServer())
+        .post(`/customers/${anyId}/credits`)
+        .send({ amountCents: 1000 })
+        .expect(401);
+
+      await request(app.getHttpServer())
+        .post(`/customers/${anyId}/credits`)
+        .set('Authorization', `Bearer ${adulterado}`)
+        .send({ amountCents: 1000 })
+        .expect(401);
+    });
+  });
 });
