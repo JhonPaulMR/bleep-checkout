@@ -317,8 +317,8 @@ stateDiagram-v2
 | Usuários / Operadores | `apps/api/src/modules/users` | `JwtAuthGuard` + `RolesGuard` (`@Roles(Role.MANAGER)` em `POST/GET /users`; regra de dono em `GET /users/:id`) | `UsersService` / `PrismaService` | US10 (#11) |
 | Produtos | `apps/api/src/modules/products` | `JwtAuthGuard` + `RolesGuard` (`@Roles(Role.MANAGER)` em `POST /products`; `@Roles(Role.MANAGER, Role.OPERATOR)` em `GET /products` com `?search=`; `@Roles(Role.OPERATOR)` em `GET /products/barcode/:barcode`) | `ProductsService` / `PrismaService` | US01 (#1), US03 (#4), US06 (#3) |
 | Clientes | `apps/api/src/modules/customers` | `JwtAuthGuard` + `RolesGuard` (`@Roles(Role.MANAGER)` em `POST /customers` e `POST /customers/:id/credits`; `@Roles(Role.MANAGER, Role.OPERATOR)` em `GET /customers`) | `CustomersService` / `PrismaService` | US02 (#2), US12 (#13) |
-| Vendas | `apps/api/src/modules/sales` | `JwtAuthGuard` + `RolesGuard` (`@Roles(Role.OPERATOR)` em `POST /sales` e `GET /sales/:id`; regra de dono `operatorId === sub`) | `SalesService` / `PrismaService` | US06 (#3) |
-| Pagamentos | `apps/api/src/modules/payments` | `JwtAuthGuard` + `RolesGuard` (`@Roles(Role.OPERATOR)` em `GET /payments/config` e `POST /sales/:id/payments/card\|pix`; regra de dono) | `PaymentsService` / `PrismaService` + `PaymentGateway` | US06 (#3) |
+| Vendas | `apps/api/src/modules/sales` | `JwtAuthGuard` + `RolesGuard` (`@Roles(Role.OPERATOR)` em `POST /sales` com `customerId` opcional e `GET /sales/:id`; regra de dono `operatorId === sub`) | `SalesService` / `PrismaService` | US04 (#5), US05 (#7), US06 (#3) |
+| Pagamentos | `apps/api/src/modules/payments` | `JwtAuthGuard` + `RolesGuard` (`@Roles(Role.OPERATOR)` em `GET /payments/config` e `POST /sales/:id/payments/card\|pix\|credit`; regra de dono) | `PaymentsService` / `PrismaService` + `PaymentGateway` | US05 (#7), US06 (#3) |
 | Webhooks | `apps/api/src/modules/webhooks` | `@Public()` em `POST /webhooks/mercadopago` protegido por HMAC-SHA256 (`WebhookSignatureValidator`) | `WebhooksService` / `PrismaService` + `PaymentGateway` | US06 (#3) |
 
 ---
@@ -338,6 +338,7 @@ stateDiagram-v2
 | 26/11/2026 | 1.0.8 | Fechamento da US12 (#13): recarga de crédito (`POST /customers/:id/credits` com incremento atômico e `CreditTransaction` `TOP_UP`) e modal de recarga habilitado na tela de Clientes |
 | 26/11/2026 | 1.0.9 | Fechamento da US03 (#4): consulta por código de barras (`GET /products/barcode/:barcode`), filtro `?search=` em `GET /products` e simulador de caixa/modal de busca fiéis a `caixa.html` e `busca.html` |
 | 26/11/2026 | 1.0.10 | Fechamento da US04 (#5): seletor de quantidade prévia (`Nº de unidades [F2]`) no simulador de caixa e no modal de busca por nome + cobertura e2e de rejeição `400` para quantidades inválidas em `POST /sales` |
+| 26/11/2026 | 1.0.11 | Fechamento da US05 (#7): `customerId` opcional em `POST /sales`, `POST /sales/:id/payments/credit` com débito atômico condicional e `CreditTransaction` `SALE_DEBIT`, card/modal `Cliente da Venda [F3]` e opção `Crédito do cliente` na `CheckoutPage` |
 
 ---
 
