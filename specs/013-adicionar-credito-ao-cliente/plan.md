@@ -17,7 +17,7 @@
   - Teste primeiro: testes unitários em `customers.service.spec.ts` (incremento atômico de `balanceCents` + gravação de `CreditTransaction(TOP_UP)` na mesma `$transaction`; `NotFoundException` `"Cliente não encontrado."` quando cliente não existe) e testes e2e em `apps/api/test/customers.e2e-spec.ts` (`POST /customers/:id/credits` `201` para `MANAGER` somando exatamente o valor e gravando `CreditTransaction(TOP_UP)`; `400` para `0`, negativo, decimal ou campo extra sem alterar saldo; `403` para `OPERATOR` sem alterar saldo; `404` para `id` inexistente; `401` sem token/token inválido); falham porque DTO, método e rota ainda não existem
   - Arquivos previstos: `apps/api/src/modules/customers/dto/add-credit.dto.ts`, `apps/api/src/modules/customers/customers.service.ts`, `apps/api/src/modules/customers/customers.service.spec.ts`, `apps/api/src/modules/customers/customers.controller.ts`, `apps/api/test/customers.e2e-spec.ts`
 
-- [ ] **Tarefa 2 — Adicionar `addCredit()` em `CustomersService` no frontend**
+- [x] **Tarefa 2 — Adicionar `addCredit()` em `CustomersService` no frontend**
   - Cobre: CA1 (camada de serviço no frontend)
   - Teste primeiro: teste unitário em `customers.service.spec.ts` verificando que `addCredit(id, amountCents)` faz `POST /customers/:id/credits` com `{ amountCents }` e desembrulha `{ data }`; falha porque o método ainda não existe
   - Arquivos previstos: `apps/web/src/app/features/customers/data/customers.service.ts`, `apps/web/src/app/features/customers/data/customers.service.spec.ts`

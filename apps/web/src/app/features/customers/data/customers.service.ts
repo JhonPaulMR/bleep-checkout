@@ -33,4 +33,12 @@ export class CustomersService {
       .post<{ data: Customer }>(`${this.apiUrl}/customers`, payload)
       .pipe(map((response) => response.data));
   }
+
+  addCredit(customerId: string, amountCents: number): Observable<Customer> {
+    return this.http
+      .post<{ data: Customer }>(`${this.apiUrl}/customers/${customerId}/credits`, {
+        amountCents,
+      })
+      .pipe(map((response) => response.data));
+  }
 }
