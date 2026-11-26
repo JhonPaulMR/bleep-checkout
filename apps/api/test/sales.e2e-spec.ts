@@ -223,25 +223,44 @@ describe('Catálogo mínimo e vendas — /products e /sales (e2e)', () => {
         .expect(400);
     });
 
-    it('rejeita com 400 para lista de itens vazia ou quantidade <= 0', async () => {
+    it('rejeita com 400 para lista de itens vazia', async () => {
       const operatorToken = await login(
         process.env.SEED_OPERATOR_EMAIL!,
         process.env.SEED_OPERATOR_PASSWORD!,
       );
-      const prod = await createTestProduct({ priceCents: 1000 });
 
       await request(app.getHttpServer())
         .post('/sales')
         .set('Authorization', `Bearer ${operatorToken}`)
         .send({ items: [] })
         .expect(400);
-
-      await request(app.getHttpServer())
-        .post('/sales')
-        .set('Authorization', `Bearer ${operatorToken}`)
-        .send({ items: [{ productId: prod.id, quantity: 0 }] })
-        .expect(400);
     });
+
+    it.each([
+      ['zero (0)', 0],
+      ['negativa (-2)', -2],
+      ['decimal (1.5)', 1.5],
+    ])(
+      'rejeita com 400 e não cria venda no banco quando quantity é %s (CA6/RN07)',
+      async (_label, quantity) => {
+        const operatorToken = await login(
+          process.env.SEED_OPERATOR_EMAIL!,
+          process.env.SEED_OPERATOR_PASSWORD!,
+        );
+        const prod = await createTestProduct({ priceCents: 1000 });
+
+        const countBefore = await prisma.sale.count();
+
+        await request(app.getHttpServer())
+          .post('/sales')
+          .set('Authorization', `Bearer ${operatorToken}`)
+          .send({ items: [{ productId: prod.id, quantity }] })
+          .expect(400);
+
+        const countAfter = await prisma.sale.count();
+        expect(countAfter).toBe(countBefore);
+      },
+    );
 
     it('rejeita com 422 para produto inativo ou inexistente', async () => {
       const operatorToken = await login(

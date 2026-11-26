@@ -16,7 +16,7 @@
 
 ## Tarefas
 
-- [ ] **Tarefa 1 — Cobrir rejeição `400` para quantidade zero, negativa e decimal em `POST /sales` (e2e)**
+- [x] **Tarefa 1 — Cobrir rejeição `400` para quantidade zero, negativa e decimal em `POST /sales` (e2e)**
   - Cobre: CA6 (RN07 na API)
   - Teste primeiro: testes e2e em `apps/api/test/sales.e2e-spec.ts` verificando `400` para `quantity: 0`, `quantity: -2` e `quantity: 1.5` sem criar `Sale` no banco
   - Arquivos previstos: `apps/api/test/sales.e2e-spec.ts`
