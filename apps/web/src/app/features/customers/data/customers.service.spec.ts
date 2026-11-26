@@ -71,4 +71,28 @@ describe('CustomersService', () => {
 
     expect(result).toEqual(created);
   });
+
+  it('addCredit(id, amountCents) faz POST /customers/:id/credits com { amountCents } e desembrulha { data }', () => {
+    const customerId = 'cust-1';
+    const amountCents = 3000;
+    const updated: Customer = {
+      id: customerId,
+      name: 'Ana Costa',
+      cpf: '12345678901',
+      balanceCents: 8000,
+      createdAt: '2026-11-25T10:00:00.000Z',
+    };
+    let result: Customer | undefined;
+
+    service.addCredit(customerId, amountCents).subscribe((data) => {
+      result = data;
+    });
+
+    const req = controller.expectOne(`${apiUrl}/customers/${customerId}/credits`);
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body).toEqual({ amountCents });
+    req.flush({ data: updated });
+
+    expect(result).toEqual(updated);
+  });
 });

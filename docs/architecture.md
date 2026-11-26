@@ -1,8 +1,8 @@
 # 🛠️ Architecture / Software Design Document
 
 **Projeto:** Bleep Checkout
-**Versão:** 1.0.7 · fechamento da US02 (cadastro de clientes com crédito)
-**Última atualização:** 25/11/2026
+**Versão:** 1.0.8 · fechamento da US12 (recarga de crédito do cliente)
+**Última atualização:** 26/11/2026
 
 > 🤖 **O `prd.md` responde _o quê_ o produto faz. Este responde _onde as coisas
 > moram e como se chamam_.** Detalhe de tela — rota, componente, contrato —
@@ -316,7 +316,7 @@ stateDiagram-v2
 | Autenticação | `apps/api/src/modules/auth` | `JwtAuthGuard` global (`@Public()` em `/auth/login`) | `UsersService` / `PrismaService` | US09 (#10) |
 | Usuários / Operadores | `apps/api/src/modules/users` | `JwtAuthGuard` + `RolesGuard` (`@Roles(Role.MANAGER)` em `POST/GET /users`; regra de dono em `GET /users/:id`) | `UsersService` / `PrismaService` | US10 (#11) |
 | Produtos | `apps/api/src/modules/products` | `JwtAuthGuard` + `RolesGuard` (`@Roles(Role.MANAGER)` em `POST /products`; `@Roles(Role.MANAGER, Role.OPERATOR)` em `GET /products`) | `ProductsService` / `PrismaService` | US01 (#1), US06 (#3) |
-| Clientes | `apps/api/src/modules/customers` | `JwtAuthGuard` + `RolesGuard` (`@Roles(Role.MANAGER)` em `POST /customers`; `@Roles(Role.MANAGER, Role.OPERATOR)` em `GET /customers`) | `CustomersService` / `PrismaService` | US02 (#2) |
+| Clientes | `apps/api/src/modules/customers` | `JwtAuthGuard` + `RolesGuard` (`@Roles(Role.MANAGER)` em `POST /customers` e `POST /customers/:id/credits`; `@Roles(Role.MANAGER, Role.OPERATOR)` em `GET /customers`) | `CustomersService` / `PrismaService` | US02 (#2), US12 (#13) |
 | Vendas | `apps/api/src/modules/sales` | `JwtAuthGuard` + `RolesGuard` (`@Roles(Role.OPERATOR)` em `POST /sales` e `GET /sales/:id`; regra de dono `operatorId === sub`) | `SalesService` / `PrismaService` | US06 (#3) |
 | Pagamentos | `apps/api/src/modules/payments` | `JwtAuthGuard` + `RolesGuard` (`@Roles(Role.OPERATOR)` em `GET /payments/config` e `POST /sales/:id/payments/card\|pix`; regra de dono) | `PaymentsService` / `PrismaService` + `PaymentGateway` | US06 (#3) |
 | Webhooks | `apps/api/src/modules/webhooks` | `@Public()` em `POST /webhooks/mercadopago` protegido por HMAC-SHA256 (`WebhookSignatureValidator`) | `WebhooksService` / `PrismaService` + `PaymentGateway` | US06 (#3) |
@@ -335,6 +335,7 @@ stateDiagram-v2
 | 25/11/2026 | 1.0.5 | Fechamento da Atividade 15 (deploy em produção): `prisma.config.ts` apontando para `DIRECT_URL`, API no Render (`https://bleep-checkout.onrender.com`), frontend no Render Static Site (`https://bleep-checkout-web.onrender.com`) com rewrite de SPA e banco Neon em São Paulo com pooling; tabela §5.3 e IDs 17/19 consolidados |
 | 25/11/2026 | 1.0.6 | Fechamento da US01 (#1): cadastro de produtos (`POST /products` para `MANAGER`, `GET /products` para `MANAGER` e `OPERATOR`), tela de Produtos e cabeçalho alinhados ao protótipo navegável |
 | 25/11/2026 | 1.0.7 | Fechamento da US02 (#2): migration de `Customer`, `CreditTransaction` e `Sale.customerId`, API `POST/GET /customers` com transação `INITIAL`, e tela de Clientes fiel ao protótipo navegável |
+| 26/11/2026 | 1.0.8 | Fechamento da US12 (#13): recarga de crédito (`POST /customers/:id/credits` com incremento atômico e `CreditTransaction` `TOP_UP`) e modal de recarga habilitado na tela de Clientes |
 
 ---
 

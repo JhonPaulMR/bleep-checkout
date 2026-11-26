@@ -1,9 +1,14 @@
-import { ConflictException, Injectable } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { CreditType } from '../../../generated/prisma/enums.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { CreateCustomerDto } from './dto/create-customer.dto.js';
 
 const DUPLICATE_CPF_MESSAGE = 'Já existe um cliente com este CPF.';
+const CUSTOMER_NOT_FOUND_MESSAGE = 'Cliente não encontrado.';
 
 @Injectable()
 export class CustomersService {
@@ -57,6 +62,32 @@ export class CustomersService {
   findAll() {
     return this.prisma.customer.findMany({
       orderBy: { name: 'asc' },
+    });
+  }
+
+  async addCredit(customerId: string, amountCents: number) {
+    return this.prisma.$transaction(async (tx) => {
+      const existing = await tx.customer.findUnique({
+        where: { id: customerId },
+      });
+      if (!existing) {
+        throw new NotFoundException(CUSTOMER_NOT_FOUND_MESSAGE);
+      }
+
+      const updated = await tx.customer.update({
+        where: { id: customerId },
+        data: { balanceCents: { increment: amountCents } },
+      });
+
+      await tx.creditTransaction.create({
+        data: {
+          customerId,
+          type: CreditType.TOP_UP,
+          amountCents,
+        },
+      });
+
+      return updated;
     });
   }
 }

@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiOperation,
@@ -7,6 +7,7 @@ import {
 } from '@nestjs/swagger';
 import { Role } from '../../../generated/prisma/enums.js';
 import { Roles } from '../../common/decorators/roles.decorator.js';
+import { AddCreditDto } from './dto/add-credit.dto.js';
 import { CreateCustomerDto } from './dto/create-customer.dto.js';
 import { CustomersService } from './customers.service.js';
 
@@ -51,5 +52,26 @@ export class CustomersController {
   })
   findAll() {
     return this.customers.findAll();
+  }
+
+  @Post(':id/credits')
+  @Roles(Role.MANAGER)
+  @ApiOperation({ summary: 'Adiciona crédito à conta de um cliente cadastrado' })
+  @ApiResponse({ status: 201, description: 'Crédito adicionado com sucesso' })
+  @ApiResponse({ status: 400, description: 'Corpo da requisição inválido' })
+  @ApiResponse({
+    status: 401,
+    description: 'Sessão ausente, inválida ou expirada',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Acesso permitido apenas para gerentes',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Cliente não encontrado.',
+  })
+  addCredit(@Param('id') id: string, @Body() dto: AddCreditDto) {
+    return this.customers.addCredit(id, dto.amountCents);
   }
 }

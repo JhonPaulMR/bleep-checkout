@@ -71,8 +71,27 @@ export class CustomersPage implements OnInit {
     return cents !== null && cents >= 0 ? null : 'O saldo inicial não pode ser negativo.';
   });
 
-  // TODO #13: recarga de crédito do cliente entra na US12
-  protected readonly addCreditDisabled = true;
+  protected readonly creditModalCustomer = signal<Customer | null>(null);
+  protected readonly creditAmount = signal('');
+  protected readonly creditSubmitted = signal(false);
+  protected readonly creditSaving = signal(false);
+  protected readonly creditSubmitError = signal<string | null>(null);
+
+  protected readonly creditAmountCents = computed(() => parseBalanceToCents(this.creditAmount()));
+
+  protected readonly creditAmountError = computed(() => {
+    const cents = this.creditAmountCents();
+    return cents === null || cents <= 0
+      ? 'Informe um valor maior que zero. O saldo não foi alterado.'
+      : null;
+  });
+
+  protected readonly creditPreviewBalance = computed(() => {
+    const customer = this.creditModalCustomer();
+    const cents = this.creditAmountCents();
+    if (!customer || cents === null || cents <= 0) return '—';
+    return this.formatBalance(customer.balanceCents + cents);
+  });
 
   protected readonly totalCreditCents = computed(() =>
     this.customers().reduce((sum, customer) => sum + customer.balanceCents, 0),
@@ -199,6 +218,49 @@ export class CustomersPage implements OnInit {
           this.submitError.set(CONNECTION_ERROR_MESSAGE);
         },
       });
+  }
+
+  protected openCreditModal(customer: Customer): void {
+    this.creditAmount.set('');
+    this.creditSubmitted.set(false);
+    this.creditSaving.set(false);
+    this.creditSubmitError.set(null);
+    this.creditModalCustomer.set(customer);
+  }
+
+  protected closeCreditModal(): void {
+    if (this.creditSaving()) return;
+    this.creditAmount.set('');
+    this.creditSubmitted.set(false);
+    this.creditSubmitError.set(null);
+    this.creditModalCustomer.set(null);
+  }
+
+  protected submitCredit(): void {
+    if (this.creditSaving()) return;
+    this.creditSubmitted.set(true);
+
+    const customer = this.creditModalCustomer();
+    const amountCents = this.creditAmountCents();
+    if (!customer || this.creditAmountError() || amountCents === null || amountCents <= 0) return;
+
+    this.creditSaving.set(true);
+    this.creditSubmitError.set(null);
+
+    this.customersService.addCredit(customer.id, amountCents).subscribe({
+      next: (updated) => {
+        this.customers.update((current) =>
+          current.map((item) => (item.id === updated.id ? updated : item)),
+        );
+        this.creditSaving.set(false);
+        this.closeCreditModal();
+      },
+      error: (err: unknown) => {
+        this.creditSaving.set(false);
+        if (err instanceof HttpErrorResponse && err.status === 401) return;
+        this.creditSubmitError.set(CONNECTION_ERROR_MESSAGE);
+      },
+    });
   }
 
   private resetForm(): void {
