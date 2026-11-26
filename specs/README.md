@@ -9,5 +9,6 @@
 | #2 | [002-cadastrar-cliente-com-credito](002-cadastrar-cliente-com-credito/spec.md) | implementada | US02 — Cadastrar cliente com crédito |
 | #13 | [013-adicionar-credito-ao-cliente](013-adicionar-credito-ao-cliente/spec.md) | implementada | US12 — Adicionar crédito ao cliente |
 | #4 | [004-montar-venda-no-simulador-de-caixa](004-montar-venda-no-simulador-de-caixa/spec.md) | implementada | US03 — Montar venda no simulador de caixa |
+| #5 | [005-inserir-quantidade-de-produtos-na-venda](005-inserir-quantidade-de-produtos-na-venda/spec.md) | aprovada | US04 — Inserir quantidade de produtos na venda |
 
 Estados: `rascunho` · `aprovada` · `implementada` · `bloqueada`
