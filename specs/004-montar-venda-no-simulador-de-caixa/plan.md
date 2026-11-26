@@ -28,7 +28,7 @@
   - Teste primeiro: testes unitários em `checkout.service.spec.ts` verificando `findProductByBarcode('7891000120140')` fazendo `GET /products/barcode/7891000120140` e `searchProducts('café')` fazendo `GET /products?search=caf%C3%A9`, ambos desembrulhando `{ data }`; falham porque os métodos ainda não existem
   - Arquivos previstos: `apps/web/src/app/features/checkout/data/checkout.service.ts`, `apps/web/src/app/features/checkout/data/checkout.service.spec.ts`
 
-- [ ] **Tarefa 3 — Reformular montagem de venda na `CheckoutPage` fiel ao protótipo `caixa.html` (EAN, leitor USB, tabela do carrinho e resumo)**
+- [x] **Tarefa 3 — Reformular montagem de venda na `CheckoutPage` fiel ao protótipo `caixa.html` (EAN, leitor USB, tabela do carrinho e resumo)**
   - Cobre: CA1 (entrada por código + botão Adicionar), CA2 (leitor USB via Enter), CA4 (alerta `Produto não localizado.` em `404` sem alterar carrinho), CA6 (layout PDV fiel a `caixa.html` preservando pagamento US06), CA9 (limpar carrinho sem criar venda)
   - Teste primeiro: testes em `checkout.page.spec.ts` cobrindo entrada por código de barras + clique em `Adicionar` somando item (e somando `+1` ao bipar o mesmo produto novamente), entrada via `Enter` (leitor USB) limpando campo, erro `404` exibindo `"Produto não localizado."` sem alterar o carrinho, remoção de item e `Limpar lista`, além de preservar todos os testes do fluxo de pagamento Cartão/PIX da US06; falham porque a página ainda usa a lista provisória da US06
   - Arquivos previstos: `apps/web/src/app/features/checkout/pages/checkout.page.ts`, `apps/web/src/app/features/checkout/pages/checkout.page.html`, `apps/web/src/app/features/checkout/pages/checkout.page.spec.ts`

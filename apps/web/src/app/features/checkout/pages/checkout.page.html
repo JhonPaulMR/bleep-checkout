@@ -1,109 +1,267 @@
 <main class="min-h-screen bg-fundo p-lg">
-  <div class="mx-auto flex max-w-5xl flex-col gap-lg">
-    <h1 class="text-titulo-pagina text-texto">Caixa</h1>
-
+  <div class="mx-auto flex max-w-6xl flex-col gap-lg">
     @if (!sale()) {
-      <!-- Montagem simplificada de venda (TODO #4: busca por código de barras e pesquisa entram na US03) -->
-      <div class="grid grid-cols-1 gap-lg md:grid-cols-3">
-        <section class="rounded-lg bg-superficie p-lg shadow md:col-span-2">
-          <h2 class="mb-md text-titulo-secao text-texto">Produtos disponíveis</h2>
-
-          @if (loadingProducts()) {
-            <p class="text-corpo text-texto-suave">Carregando produtos...</p>
-          } @else if (productsError(); as message) {
-            <p class="text-corpo text-perigo" role="alert">{{ message }}</p>
-          } @else if (products().length === 0) {
-            <p class="text-corpo text-texto-suave">Nenhum produto ativo disponível.</p>
-          } @else {
-            <ul class="divide-y divide-desabilitado">
-              @for (product of products(); track product.id) {
-                <li class="flex items-center justify-between gap-md py-sm">
-                  <div class="flex flex-col gap-xs">
-                    <span class="text-corpo-destaque text-texto">{{ product.name }}</span>
-                    <span class="text-legenda text-texto-suave">
-                      {{ formatCents(product.priceCents) }}
-                    </span>
-                  </div>
-                  <button
-                    type="button"
-                    [attr.data-testid]="'add-product-' + product.id"
-                    class="rounded-md bg-primaria px-md py-xs text-corpo-destaque text-superficie hover:brightness-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primaria disabled:bg-desabilitado"
-                    [disabled]="creatingSale()"
-                    (click)="addProduct(product)"
-                  >
-                    Adicionar
-                  </button>
-                </li>
-              }
-            </ul>
-          }
-        </section>
-
-        <section class="flex flex-col gap-md rounded-lg bg-superficie p-lg shadow">
-          <h2 class="text-titulo-secao text-texto">Itens da venda</h2>
-
-          @if (cart().length === 0) {
-            <p class="text-corpo text-texto-suave">Adicione produtos para iniciar a venda.</p>
-          } @else {
-            <ul class="divide-y divide-desabilitado">
-              @for (item of cart(); track item.product.id) {
-                <li class="flex items-center justify-between gap-sm py-sm">
-                  <div class="flex flex-col gap-xs">
-                    <span class="text-corpo text-texto">{{ item.product.name }}</span>
-                    <span class="text-legenda text-texto-suave">
-                      {{ item.quantity }}x {{ formatCents(item.product.priceCents) }}
-                    </span>
-                  </div>
-                  <div class="flex items-center gap-xs">
-                    <button
-                      type="button"
-                      class="rounded-md border border-primaria px-sm py-xs text-corpo-destaque text-primaria hover:bg-fundo focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primaria disabled:border-desabilitado disabled:text-desabilitado"
-                      [disabled]="creatingSale()"
-                      (click)="decreaseProduct(item.product.id)"
-                      aria-label="Diminuir quantidade"
-                    >
-                      -
-                    </button>
-                    <button
-                      type="button"
-                      class="rounded-md border border-primaria px-sm py-xs text-corpo-destaque text-primaria hover:bg-fundo focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primaria disabled:border-desabilitado disabled:text-desabilitado"
-                      [disabled]="creatingSale()"
-                      (click)="addProduct(item.product)"
-                      aria-label="Aumentar quantidade"
-                    >
-                      +
-                    </button>
-                  </div>
-                </li>
-              }
-            </ul>
-          }
-
-          <div class="border-t border-desabilitado pt-md">
-            <p class="text-legenda text-texto-suave">Total estimado ({{ cartItemCount() }} itens)</p>
-            <p class="text-valor-destaque text-texto">{{ formatCents(cartTotalCents()) }}</p>
+      <header class="flex flex-wrap items-center justify-between gap-md rounded-lg bg-superficie p-md shadow">
+        <div class="flex items-center gap-sm">
+          <span class="material-symbols-outlined text-primaria" aria-hidden="true">
+            point_of_sale
+          </span>
+          <div class="flex flex-col">
+            <h1 class="text-titulo-secao text-texto">
+              Terminal 01 · Operador: {{ operatorName() }}
+            </h1>
+            <p class="text-legenda text-texto-suave">Sessão em andamento</p>
           </div>
+        </div>
 
-          @if (saleError(); as message) {
-            <p class="text-corpo text-perigo" role="alert">{{ message }}</p>
-          }
-
-          <button
-            type="button"
-            data-testid="proceed-payment"
-            class="w-full rounded-md bg-primaria px-md py-sm text-corpo-destaque text-superficie hover:brightness-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primaria disabled:bg-desabilitado"
-            [disabled]="creatingSale() || cart().length === 0"
-            (click)="proceedToPayment()"
+        <div class="flex flex-wrap items-center gap-sm">
+          <span
+            class="inline-flex items-center gap-xs rounded-full bg-sucesso/10 px-md py-xs text-legenda font-semibold text-sucesso"
           >
-            @if (creatingSale()) {
-              Criando venda...
-            } @else {
-              Prosseguir para pagamento
+            API conectada
+          </span>
+          <span
+            class="inline-flex items-center gap-xs rounded-full bg-primaria/10 px-md py-xs text-legenda font-semibold text-primaria"
+          >
+            Leitor USB pronto
+          </span>
+        </div>
+      </header>
+
+      <div class="grid grid-cols-1 items-start gap-lg lg:grid-cols-12">
+        <div class="flex flex-col gap-lg lg:col-span-8">
+          <section class="flex flex-col gap-md rounded-lg bg-superficie p-lg shadow">
+            <div class="flex items-center justify-between gap-sm">
+              <label for="barcodeInput" class="text-corpo-destaque text-texto">
+                Código de barras (EAN-13)
+              </label>
+              <kbd
+                class="rounded border border-desabilitado bg-fundo px-sm py-xs text-legenda text-texto-suave"
+              >
+                [F4]
+              </kbd>
+            </div>
+
+            <div class="flex flex-col gap-sm sm:flex-row">
+              <input
+                #barcodeInput
+                id="barcodeInput"
+                name="barcodeInput"
+                type="text"
+                data-testid="barcode-input"
+                placeholder="Bipar ou digitar EAN-13..."
+                class="flex-1 rounded-md border border-desabilitado bg-superficie px-md py-sm text-corpo text-texto focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primaria"
+                [ngModel]="barcodeTerm()"
+                (ngModelChange)="barcodeTerm.set($event)"
+                (keydown.enter)="addByBarcode()"
+              />
+              <button
+                type="button"
+                data-testid="add-by-barcode"
+                class="rounded-md bg-primaria px-md py-sm text-corpo-destaque text-superficie hover:brightness-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primaria disabled:bg-desabilitado"
+                [disabled]="lookingUpBarcode() || creatingSale()"
+                (click)="addByBarcode()"
+              >
+                @if (lookingUpBarcode()) {
+                  Buscando...
+                } @else {
+                  Adicionar
+                }
+              </button>
+              <button
+                type="button"
+                data-testid="open-search-modal"
+                class="rounded-md border border-primaria px-md py-sm text-corpo-destaque text-primaria hover:bg-fundo focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primaria disabled:border-desabilitado disabled:text-desabilitado"
+                [disabled]="creatingSale()"
+                (click)="openSearchModal()"
+              >
+                Buscar por nome
+              </button>
+            </div>
+
+            <p class="text-legenda text-texto-suave">
+              Ler de novo o mesmo produto soma a quantidade ao item que já está na venda.
+            </p>
+
+            @if (barcodeError(); as message) {
+              <p
+                data-testid="barcode-error"
+                class="text-corpo text-perigo"
+                role="alert"
+              >
+                {{ message }}
+              </p>
             }
-          </button>
-        </section>
+          </section>
+
+          <section class="flex flex-col gap-md rounded-lg bg-superficie p-lg shadow">
+            <div class="flex flex-wrap items-center justify-between gap-sm">
+              <div class="flex items-center gap-sm">
+                <span class="material-symbols-outlined text-primaria" aria-hidden="true">
+                  shopping_cart
+                </span>
+                <h2 class="text-titulo-secao text-texto">Produtos no Carrinho</h2>
+                <span
+                  class="rounded-full bg-fundo px-sm py-xs text-legenda font-semibold text-texto-suave"
+                >
+                  {{ cartItemCount() }} itens
+                </span>
+              </div>
+
+              @if (cart().length > 0) {
+                <button
+                  type="button"
+                  data-testid="clear-cart"
+                  class="rounded-md border border-perigo px-sm py-xs text-legenda font-semibold text-perigo hover:bg-fundo focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-perigo disabled:border-desabilitado disabled:text-desabilitado"
+                  [disabled]="creatingSale()"
+                  (click)="clearCart()"
+                >
+                  Limpar lista
+                </button>
+              }
+            </div>
+
+            @if (cart().length === 0) {
+              <p class="py-lg text-center text-corpo text-texto-suave">
+                Nenhum produto adicionado. Bipe um código de barras ou busque por nome para iniciar
+                a venda.
+              </p>
+            } @else {
+              <div class="overflow-x-auto">
+                <table class="w-full border-collapse text-left">
+                  <thead>
+                    <tr class="border-b border-desabilitado text-legenda text-texto-suave">
+                      <th class="py-sm pr-sm font-semibold">#</th>
+                      <th class="py-sm pr-sm font-semibold">Código EAN</th>
+                      <th class="py-sm pr-sm font-semibold">Produto</th>
+                      <th class="py-sm pr-sm font-semibold">Qtd</th>
+                      <th class="py-sm pr-sm text-right font-semibold">Preço unit.</th>
+                      <th class="py-sm pr-sm text-right font-semibold">Subtotal</th>
+                      <th class="py-sm text-right font-semibold">Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-desabilitado">
+                    @for (item of cart(); track item.product.id; let i = $index) {
+                      <tr class="text-corpo text-texto">
+                        <td class="py-sm pr-sm text-legenda text-texto-suave">
+                          {{ formatRowIndex(i) }}
+                        </td>
+                        <td class="py-sm pr-sm text-legenda text-texto-suave">
+                          {{ item.product.barcode }}
+                        </td>
+                        <td class="py-sm pr-sm text-corpo-destaque text-texto">
+                          {{ item.product.name }}
+                        </td>
+                        <td class="py-sm pr-sm">
+                          <div class="inline-flex items-center gap-xs">
+                            <button
+                              type="button"
+                              class="rounded border border-desabilitado px-xs text-legenda text-texto hover:bg-fundo focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primaria disabled:text-desabilitado"
+                              [disabled]="creatingSale()"
+                              (click)="decreaseProduct(item.product.id)"
+                              aria-label="Diminuir quantidade"
+                            >
+                              -
+                            </button>
+                            <span class="min-w-10 text-center text-legenda font-semibold">
+                              {{ item.quantity }} un
+                            </span>
+                            <button
+                              type="button"
+                              class="rounded border border-desabilitado px-xs text-legenda text-texto hover:bg-fundo focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primaria disabled:text-desabilitado"
+                              [disabled]="creatingSale()"
+                              (click)="addProduct(item.product)"
+                              aria-label="Aumentar quantidade"
+                            >
+                              +
+                            </button>
+                          </div>
+                        </td>
+                        <td class="py-sm pr-sm text-right text-legenda text-texto-suave">
+                          {{ formatCents(item.product.priceCents) }}
+                        </td>
+                        <td class="py-sm pr-sm text-right text-corpo-destaque text-texto">
+                          {{ formatCents(item.product.priceCents * item.quantity) }}
+                        </td>
+                        <td class="py-sm text-right">
+                          <button
+                            type="button"
+                            [attr.data-testid]="'remove-item-' + item.product.id"
+                            class="inline-flex items-center rounded p-xs text-perigo hover:bg-fundo focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-perigo disabled:text-desabilitado"
+                            [disabled]="creatingSale()"
+                            (click)="removeProduct(item.product.id)"
+                            aria-label="Remover item"
+                          >
+                            <span class="material-symbols-outlined text-[18px]" aria-hidden="true">
+                              delete
+                            </span>
+                          </button>
+                        </td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+
+              <div class="border-t border-desabilitado pt-sm text-legenda text-texto-suave">
+                {{ cartItemCount() }} unidades · Total calculado pelo servidor
+              </div>
+            }
+          </section>
+        </div>
+
+        <aside class="flex flex-col gap-lg lg:col-span-4">
+          <!-- TODO #7: card de identificação do cliente da venda entra na US05 -->
+          <section class="flex flex-col gap-md rounded-lg bg-superficie p-lg shadow">
+            <h2 class="text-titulo-secao text-texto">Resumo da Venda</h2>
+
+            <div class="flex flex-col gap-sm border-b border-desabilitado pb-md text-corpo">
+              <div class="flex items-center justify-between text-texto-suave">
+                <span>Itens:</span>
+                <span class="text-texto">{{ cartItemCount() }} unidades</span>
+              </div>
+              <div class="flex items-center justify-between text-texto-suave">
+                <span>Subtotal (preço × qtd):</span>
+                <span class="text-texto">{{ formatCents(cartTotalCents()) }}</span>
+              </div>
+            </div>
+
+            <div class="flex flex-col gap-xs rounded-md bg-fundo p-md">
+              <div class="flex items-center justify-between">
+                <span class="text-legenda font-semibold text-texto-suave">TOTAL A PAGAR</span>
+                <span
+                  class="rounded bg-primaria/10 px-sm py-xs text-legenda font-semibold text-primaria"
+                >
+                  BRL
+                </span>
+              </div>
+              <p class="text-valor-destaque text-primaria">{{ formatCents(cartTotalCents()) }}</p>
+            </div>
+
+            @if (saleError(); as message) {
+              <p class="text-corpo text-perigo" role="alert">{{ message }}</p>
+            }
+
+            <button
+              type="button"
+              data-testid="proceed-payment"
+              class="w-full rounded-md bg-primaria px-md py-sm text-corpo-destaque text-superficie hover:brightness-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primaria disabled:bg-desabilitado"
+              [disabled]="creatingSale() || cart().length === 0"
+              (click)="proceedToPayment()"
+            >
+              @if (creatingSale()) {
+                Criando venda...
+              } @else {
+                Prosseguir para pagamento [F9]
+              }
+            </button>
+
+            <!-- TODO #8: botão Cancelar venda [F8] com persistência de status CANCELED entra na US08 -->
+          </section>
+        </aside>
       </div>
     } @else if (sale(); as currentSale) {
+      <h1 class="text-titulo-pagina text-texto">Caixa</h1>
       <section class="flex flex-col gap-md rounded-lg bg-superficie p-lg shadow">
         <div class="flex flex-wrap items-center justify-between gap-md border-b border-desabilitado pb-md">
           <div>

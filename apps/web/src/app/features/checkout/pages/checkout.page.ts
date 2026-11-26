@@ -4,12 +4,15 @@ import {
   Component,
   computed,
   DestroyRef,
+  ElementRef,
   inject,
   Injector,
-  OnInit,
   signal,
+  viewChild,
 } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import { firstValueFrom, Subscription } from 'rxjs';
+import { AuthService } from '../../../core/auth/auth.service';
 import {
   CheckoutService,
   Payment,
@@ -81,12 +84,18 @@ interface WindowWithMercadoPago extends Window {
 
 @Component({
   selector: 'app-checkout-page',
+  imports: [FormsModule],
   templateUrl: './checkout.page.html',
+  host: {
+    '(window:keydown)': 'onWindowKeydown($event)',
+  },
 })
-export class CheckoutPage implements OnInit {
+export class CheckoutPage {
+  private readonly auth = inject(AuthService);
   private readonly checkoutService = inject(CheckoutService);
   private readonly destroyRef = inject(DestroyRef);
   private readonly injector = inject(Injector);
+  private readonly barcodeInputEl = viewChild<ElementRef<HTMLInputElement>>('barcodeInput');
 
   private pollingSubscription: Subscription | null = null;
   private cardBrickController: CardBrickController | null = null;
@@ -94,10 +103,11 @@ export class CheckoutPage implements OnInit {
   private destroyed = false;
   private brickMountSeq = 0;
 
-  // TODO #4: seleção simplificada dos produtos do catálogo seedado; leitor de código de barras e busca avançada entram na US03.
-  protected readonly products = signal<Product[]>([]);
-  protected readonly loadingProducts = signal(true);
-  protected readonly productsError = signal<string | null>(null);
+  protected readonly operatorName = computed(() => this.auth.user()?.name ?? 'Operador');
+
+  protected readonly barcodeTerm = signal('');
+  protected readonly lookingUpBarcode = signal(false);
+  protected readonly barcodeError = signal<string | null>(null);
 
   protected readonly cart = signal<CartItem[]>([]);
   protected readonly cartTotalCents = computed(() =>
@@ -140,19 +150,11 @@ export class CheckoutPage implements OnInit {
     });
   }
 
-  ngOnInit(): void {
-    this.checkoutService.listProducts().subscribe({
-      next: (products) => {
-        this.products.set(products);
-        this.productsError.set(null);
-        this.loadingProducts.set(false);
-      },
-      error: (err: unknown) => {
-        this.loadingProducts.set(false);
-        if (err instanceof HttpErrorResponse && err.status === 401) return;
-        this.productsError.set(this.extractErrorMessage(err));
-      },
-    });
+  protected onWindowKeydown(event: KeyboardEvent): void {
+    if (event.key === 'F4' && !this.sale()) {
+      event.preventDefault();
+      this.focusBarcodeInput();
+    }
   }
 
   protected formatCents(cents: number): string {
@@ -160,6 +162,42 @@ export class CheckoutPage implements OnInit {
       style: 'currency',
       currency: 'BRL',
     }).format(cents / 100);
+  }
+
+  protected formatRowIndex(index: number): string {
+    return String(index + 1).padStart(2, '0');
+  }
+
+  protected addByBarcode(): void {
+    const code = this.barcodeTerm().trim();
+    if (!code || this.lookingUpBarcode() || this.creatingSale()) return;
+
+    this.barcodeError.set(null);
+    this.lookingUpBarcode.set(true);
+
+    this.checkoutService.findProductByBarcode(code).subscribe({
+      next: (product) => {
+        this.lookingUpBarcode.set(false);
+        // TODO #5: quantidade prévia configurável entra na US04
+        this.addProduct(product);
+        this.barcodeTerm.set('');
+        this.barcodeError.set(null);
+        this.focusBarcodeInput();
+      },
+      error: (err: unknown) => {
+        this.lookingUpBarcode.set(false);
+        if (err instanceof HttpErrorResponse && err.status === 401) return;
+        if (err instanceof HttpErrorResponse && err.status === 404) {
+          this.barcodeError.set('Produto não localizado.');
+          return;
+        }
+        this.barcodeError.set(NETWORK_ERROR_MESSAGE);
+      },
+    });
+  }
+
+  protected openSearchModal(): void {
+    // Modal de busca por nome será implementado na Tarefa 4.
   }
 
   protected addProduct(product: Product): void {
@@ -183,6 +221,22 @@ export class CheckoutPage implements OnInit {
         )
         .filter((item) => item.quantity > 0),
     );
+  }
+
+  protected removeProduct(productId: string): void {
+    this.saleError.set(null);
+    this.cart.update((items) => items.filter((item) => item.product.id !== productId));
+  }
+
+  protected clearCart(): void {
+    this.cart.set([]);
+    this.saleError.set(null);
+    this.barcodeError.set(null);
+    this.focusBarcodeInput();
+  }
+
+  private focusBarcodeInput(): void {
+    this.barcodeInputEl()?.nativeElement.focus();
   }
 
   protected proceedToPayment(): void {
@@ -284,6 +338,8 @@ export class CheckoutPage implements OnInit {
     this.sale.set(null);
     this.lastPayment.set(null);
     this.cart.set([]);
+    this.barcodeTerm.set('');
+    this.barcodeError.set(null);
     this.saleError.set(null);
     this.paymentError.set(null);
     this.declinedMessage.set(null);
