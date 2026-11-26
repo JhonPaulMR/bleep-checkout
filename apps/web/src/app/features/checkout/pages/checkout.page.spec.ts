@@ -8,6 +8,7 @@ import { AuthService } from '../../../core/auth/auth.service';
 import { IdleSessionService } from '../../../core/auth/idle-session.service';
 import { API_URL } from '../../../core/config/api-url';
 import {
+  CheckoutCustomer,
   CheckoutService,
   PaymentResponse,
   Product,
@@ -32,6 +33,7 @@ interface MockBrickConfig {
 describe('CheckoutPage', () => {
   let findProductByBarcodeSpy: ReturnType<typeof vi.fn>;
   let searchProductsSpy: ReturnType<typeof vi.fn>;
+  let listCustomersSpy: ReturnType<typeof vi.fn>;
   let createSaleSpy: ReturnType<typeof vi.fn>;
   let pollSaleUntilSettledSpy: ReturnType<typeof vi.fn>;
   let getPaymentConfigSpy: ReturnType<typeof vi.fn>;
@@ -59,6 +61,21 @@ describe('CheckoutPage', () => {
       priceCents: 800,
       active: true,
       createdAt: '2026-11-24T10:00:00.000Z',
+    },
+  ];
+
+  const sampleCustomers: CheckoutCustomer[] = [
+    {
+      id: 'cust-1',
+      name: 'Ana Clara',
+      cpf: '12345678901',
+      balanceCents: 15000,
+    },
+    {
+      id: 'cust-2',
+      name: 'Bruno Silva',
+      cpf: '98765432100',
+      balanceCents: 4500,
     },
   ];
 
@@ -123,6 +140,7 @@ describe('CheckoutPage', () => {
       }
       return of(sampleProducts.filter((p) => p.name.toLowerCase().includes(normalized)));
     });
+    listCustomersSpy = vi.fn().mockReturnValue(of(sampleCustomers));
     createSaleSpy = vi.fn().mockReturnValue(of(openSale));
     pollSaleUntilSettledSpy = vi.fn().mockReturnValue(new Subject<Sale>().asObservable());
     getPaymentConfigSpy = vi.fn().mockReturnValue(of({ publicKey: 'TEST-public-key-123' }));
@@ -137,6 +155,7 @@ describe('CheckoutPage', () => {
           useValue: {
             findProductByBarcode: findProductByBarcodeSpy,
             searchProducts: searchProductsSpy,
+            listCustomers: listCustomersSpy,
             createSale: createSaleSpy,
             pollSaleUntilSettled: pollSaleUntilSettledSpy,
             getPaymentConfig: getPaymentConfigSpy,
@@ -1029,5 +1048,231 @@ describe('CheckoutPage', () => {
       'Produto não localizado.',
     );
     expect(el.querySelectorAll('tbody tr').length).toBe(0);
+  });
+
+  it('US05 CA5: card Cliente da Venda exibe estado vazio e abre modal pelo botão e pela tecla F3 carregando clientes', async () => {
+    const fixture = setup();
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+
+    const card = el.querySelector('[data-testid="customer-card"]')!;
+    expect(card).not.toBeNull();
+    expect(card.textContent).toContain('Cliente da Venda');
+    expect(card.textContent).toContain('[F3]');
+    expect(card.textContent).toContain('Nenhum cliente identificado');
+
+    const identifyBtn = el.querySelector<HTMLButtonElement>('[data-testid="identify-customer-btn"]')!;
+    expect(identifyBtn.disabled).toBe(false);
+    identifyBtn.click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(listCustomersSpy).toHaveBeenCalledTimes(1);
+    expect(el.querySelector('[data-testid="customer-modal"]')).not.toBeNull();
+    expect(el.querySelector('[data-testid="customer-modal"]')?.textContent).toContain('Ana Clara');
+    expect(el.querySelector('[data-testid="customer-modal"]')?.textContent).toContain('Bruno Silva');
+
+    // Fecha por Esc e reabre usando F3
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    fixture.detectChanges();
+    expect(el.querySelector('[data-testid="customer-modal"]')).toBeNull();
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'F3' }));
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(listCustomersSpy).toHaveBeenCalledTimes(2);
+    expect(el.querySelector('[data-testid="customer-modal"]')).not.toBeNull();
+  });
+
+  it('US05 CA5: filtra clientes no modal por nome e por CPF (com ou sem pontuação)', async () => {
+    const fixture = setup();
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+
+    el.querySelector<HTMLButtonElement>('[data-testid="identify-customer-btn"]')!.click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const searchInput = el.querySelector<HTMLInputElement>('[data-testid="customer-search-input"]')!;
+
+    // Filtro por nome (case-insensitive)
+    searchInput.value = 'ana';
+    searchInput.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+
+    let modalText = el.querySelector('[data-testid="customer-modal"]')?.textContent ?? '';
+    expect(modalText).toContain('Ana Clara');
+    expect(modalText).not.toContain('Bruno Silva');
+
+    // Filtro por CPF com pontuação
+    searchInput.value = '987.654';
+    searchInput.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+
+    modalText = el.querySelector('[data-testid="customer-modal"]')?.textContent ?? '';
+    expect(modalText).toContain('Bruno Silva');
+    expect(modalText).not.toContain('Ana Clara');
+
+    // Filtro por CPF sem pontuação
+    searchInput.value = '12345678901';
+    searchInput.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+
+    modalText = el.querySelector('[data-testid="customer-modal"]')?.textContent ?? '';
+    expect(modalText).toContain('Ana Clara');
+    expect(modalText).not.toContain('Bruno Silva');
+  });
+
+  it('US05 CA5: selecionar cliente fecha modal e exibe nome, CPF formatado e saldo em verde no card lateral', async () => {
+    const fixture = setup();
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+
+    el.querySelector<HTMLButtonElement>('[data-testid="identify-customer-btn"]')!.click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    el.querySelector<HTMLButtonElement>('[data-testid="select-customer-cust-1"]')!.click();
+    fixture.detectChanges();
+
+    expect(el.querySelector('[data-testid="customer-modal"]')).toBeNull();
+
+    const card = el.querySelector('[data-testid="customer-card"]')!;
+    expect(card.textContent).toContain('Ana Clara');
+    expect(card.textContent).toContain('123.456.789-01');
+    const balanceEl = card.querySelector('[data-testid="selected-customer-balance"]')!;
+    expect(balanceEl.classList.contains('text-sucesso')).toBe(true);
+    expect(balanceEl.textContent).toContain('150,00');
+  });
+
+  it('US05 CA5: envia customerId em createSale quando cliente selecionado e omite quando sem cliente', async () => {
+    const fixture = setup();
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+
+    // Seleciona cliente e adiciona produto
+    el.querySelector<HTMLButtonElement>('[data-testid="identify-customer-btn"]')!.click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+    el.querySelector<HTMLButtonElement>('[data-testid="select-customer-cust-1"]')!.click();
+    fixture.detectChanges();
+
+    await addFirstProductAndProceed(fixture);
+
+    expect(createSaleSpy).toHaveBeenCalledWith(
+      [{ productId: 'prod-1', quantity: 1 }],
+      'cust-1',
+    );
+  });
+
+  it('US05: permite trocar e remover cliente selecionado e limpa ao iniciar nova venda', async () => {
+    const fixture = setup();
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+
+    // Seleciona Ana Clara
+    el.querySelector<HTMLButtonElement>('[data-testid="identify-customer-btn"]')!.click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+    el.querySelector<HTMLButtonElement>('[data-testid="select-customer-cust-1"]')!.click();
+    fixture.detectChanges();
+    expect(el.querySelector('[data-testid="customer-card"]')?.textContent).toContain('Ana Clara');
+
+    // Troca para Bruno Silva
+    el.querySelector<HTMLButtonElement>('[data-testid="change-customer-btn"]')!.click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+    el.querySelector<HTMLButtonElement>('[data-testid="select-customer-cust-2"]')!.click();
+    fixture.detectChanges();
+    expect(el.querySelector('[data-testid="customer-card"]')?.textContent).toContain('Bruno Silva');
+    expect(el.querySelector('[data-testid="customer-card"]')?.textContent).toContain('987.654.321-00');
+
+    // Remove cliente
+    el.querySelector<HTMLButtonElement>('[data-testid="remove-customer-btn"]')!.click();
+    fixture.detectChanges();
+    expect(el.querySelector('[data-testid="customer-card"]')?.textContent).toContain(
+      'Nenhum cliente identificado',
+    );
+  });
+
+  it('US05 CA8: fechar modal por Esc, Cancelar ou backdrop mantém cliente selecionado e carrinho inalterados', async () => {
+    const fixture = setup();
+    fixture.detectChanges();
+    const el = addByBarcodeClick(fixture, '7890000000001');
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    // Seleciona Ana Clara
+    el.querySelector<HTMLButtonElement>('[data-testid="identify-customer-btn"]')!.click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+    el.querySelector<HTMLButtonElement>('[data-testid="select-customer-cust-1"]')!.click();
+    fixture.detectChanges();
+
+    // Abre para trocar e fecha com Cancelar
+    el.querySelector<HTMLButtonElement>('[data-testid="change-customer-btn"]')!.click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+    el.querySelector<HTMLButtonElement>('[data-testid="cancel-customer-modal"]')!.click();
+    fixture.detectChanges();
+
+    expect(el.querySelector('[data-testid="customer-modal"]')).toBeNull();
+    expect(el.querySelector('[data-testid="customer-card"]')?.textContent).toContain('Ana Clara');
+    expect(el.querySelectorAll('tbody tr').length).toBe(1);
+
+    // Abre para trocar e fecha clicando no backdrop
+    el.querySelector<HTMLButtonElement>('[data-testid="change-customer-btn"]')!.click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+    const backdrop = el.querySelector<HTMLElement>('[data-testid="customer-modal"]')!;
+    backdrop.click();
+    fixture.detectChanges();
+
+    expect(el.querySelector('[data-testid="customer-modal"]')).toBeNull();
+    expect(el.querySelector('[data-testid="customer-card"]')?.textContent).toContain('Ana Clara');
+    expect(el.querySelectorAll('tbody tr').length).toBe(1);
+  });
+
+  it('US05 CA7: erro de rede ao listar clientes exibe mensagem amigável, mantém carrinho/cliente e permite tentar novamente', async () => {
+    const fixture = setup();
+    fixture.detectChanges();
+    const el = addByBarcodeClick(fixture, '7890000000001');
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    listCustomersSpy.mockReturnValueOnce(
+      throwError(() => new HttpErrorResponse({ status: 0, statusText: 'Unknown Error' })),
+    );
+
+    el.querySelector<HTMLButtonElement>('[data-testid="identify-customer-btn"]')!.click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const errorEl = el.querySelector('[data-testid="customer-modal-error"]');
+    expect(errorEl?.getAttribute('role')).toBe('alert');
+    expect(errorEl?.textContent).toContain('Não foi possível conectar. Tente novamente.');
+    expect(el.querySelectorAll('tbody tr').length).toBe(1);
+
+    // Tentar novamente com sucesso
+    el.querySelector<HTMLButtonElement>('[data-testid="retry-load-customers"]')!.click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(listCustomersSpy).toHaveBeenCalledTimes(2);
+    expect(el.querySelector('[data-testid="customer-modal-error"]')).toBeNull();
+    expect(el.querySelector('[data-testid="customer-modal"]')?.textContent).toContain('Ana Clara');
   });
 });

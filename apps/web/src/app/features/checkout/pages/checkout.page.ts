@@ -14,6 +14,7 @@ import { FormsModule } from '@angular/forms';
 import { firstValueFrom, Subscription } from 'rxjs';
 import { AuthService } from '../../../core/auth/auth.service';
 import {
+  CheckoutCustomer,
   CheckoutService,
   Payment,
   PayWithCardPayload,
@@ -128,6 +129,27 @@ export class CheckoutPage {
   protected readonly searchError = signal<string | null>(null);
   protected readonly hasSearched = signal(false);
 
+  protected readonly selectedCustomer = signal<CheckoutCustomer | null>(null);
+  protected readonly customerModalOpen = signal(false);
+  protected readonly customers = signal<CheckoutCustomer[]>([]);
+  protected readonly customerSearchTerm = signal('');
+  protected readonly loadingCustomers = signal(false);
+  protected readonly customerError = signal<string | null>(null);
+  protected readonly filteredCustomers = computed(() => {
+    const term = this.customerSearchTerm().trim();
+    if (!term) return this.customers();
+
+    const nameQuery = term.toLowerCase();
+    const digitsQuery = term.replace(/\D/g, '');
+
+    return this.customers().filter((customer) => {
+      const matchesName = customer.name.toLowerCase().includes(nameQuery);
+      const matchesCpf =
+        digitsQuery !== '' && customer.cpf.replace(/\D/g, '').includes(digitsQuery);
+      return matchesName || matchesCpf;
+    });
+  });
+
   protected readonly cart = signal<CartItem[]>([]);
   protected readonly cartTotalCents = computed(() =>
     this.cart().reduce((sum, item) => sum + item.product.priceCents * item.quantity, 0),
@@ -170,19 +192,34 @@ export class CheckoutPage {
   }
 
   protected onWindowKeydown(event: KeyboardEvent): void {
-    if (event.key === 'Escape' && this.searchModalOpen()) {
-      event.preventDefault();
-      this.closeSearchModal();
-      return;
+    if (event.key === 'Escape') {
+      if (this.searchModalOpen()) {
+        event.preventDefault();
+        this.closeSearchModal();
+        return;
+      }
+      if (this.customerModalOpen()) {
+        event.preventDefault();
+        this.closeCustomerModal();
+        return;
+      }
     }
 
-    if (event.key === 'F2' && !this.sale() && !this.searchModalOpen()) {
+    const anyModalOpen = this.searchModalOpen() || this.customerModalOpen();
+
+    if (event.key === 'F2' && !this.sale() && !anyModalOpen) {
       event.preventDefault();
       this.quantityInputEl()?.nativeElement.focus();
       return;
     }
 
-    if (event.key === 'F4' && !this.sale() && !this.searchModalOpen()) {
+    if (event.key === 'F3' && !this.sale() && !anyModalOpen) {
+      event.preventDefault();
+      this.openCustomerModal();
+      return;
+    }
+
+    if (event.key === 'F4' && !this.sale() && !anyModalOpen) {
       event.preventDefault();
       this.focusBarcodeInput();
     }
@@ -193,6 +230,12 @@ export class CheckoutPage {
       style: 'currency',
       currency: 'BRL',
     }).format(cents / 100);
+  }
+
+  protected formatCpf(cpf: string): string {
+    const digits = cpf.replace(/\D/g, '');
+    if (digits.length !== 11) return cpf;
+    return digits.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
   }
 
   protected formatRowIndex(index: number): string {
@@ -263,6 +306,53 @@ export class CheckoutPage {
   protected closeSearchModal(): void {
     this.searchModalOpen.set(false);
     this.focusBarcodeInput();
+  }
+
+  protected openCustomerModal(): void {
+    if (this.creatingSale() || this.sale()) return;
+    this.customerSearchTerm.set('');
+    this.customerError.set(null);
+    this.customerModalOpen.set(true);
+    this.loadCustomers();
+  }
+
+  protected closeCustomerModal(): void {
+    this.customerModalOpen.set(false);
+    this.focusBarcodeInput();
+  }
+
+  protected onCustomerModalBackdropClick(event: MouseEvent): void {
+    if (event.target === event.currentTarget) {
+      this.closeCustomerModal();
+    }
+  }
+
+  protected loadCustomers(): void {
+    if (this.loadingCustomers()) return;
+
+    this.customerError.set(null);
+    this.loadingCustomers.set(true);
+
+    this.checkoutService.listCustomers().subscribe({
+      next: (customers) => {
+        this.loadingCustomers.set(false);
+        this.customers.set(customers);
+      },
+      error: (err: unknown) => {
+        this.loadingCustomers.set(false);
+        if (err instanceof HttpErrorResponse && err.status === 401) return;
+        this.customerError.set(NETWORK_ERROR_MESSAGE);
+      },
+    });
+  }
+
+  protected selectCustomer(customer: CheckoutCustomer): void {
+    this.selectedCustomer.set(customer);
+    this.closeCustomerModal();
+  }
+
+  protected removeSelectedCustomer(): void {
+    this.selectedCustomer.set(null);
   }
 
   protected runProductSearch(): void {
@@ -348,7 +438,12 @@ export class CheckoutPage {
       quantity: item.quantity,
     }));
 
-    this.checkoutService.createSale(itemsPayload).subscribe({
+    const customerId = this.selectedCustomer()?.id;
+    const createSale$ = customerId
+      ? this.checkoutService.createSale(itemsPayload, customerId)
+      : this.checkoutService.createSale(itemsPayload);
+
+    createSale$.subscribe({
       next: (createdSale) => {
         this.creatingSale.set(false);
         this.sale.set(createdSale);
@@ -445,6 +540,10 @@ export class CheckoutPage {
     this.declinedMessage.set(null);
     this.copiedPixCode.set(false);
     this.selectedMethod.set('CARD');
+    this.selectedCustomer.set(null);
+    this.customerModalOpen.set(false);
+    this.customerSearchTerm.set('');
+    this.customerError.set(null);
   }
 
   private initializeCardBrick(currentSale: Sale): void {

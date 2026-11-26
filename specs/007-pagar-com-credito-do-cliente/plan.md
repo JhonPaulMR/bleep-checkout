@@ -35,7 +35,7 @@
   - Teste primeiro: testes unitários em `checkout.service.spec.ts` verificando `listCustomers()` (`GET /customers`), `createSale(items, customerId)` enviando `customerId` quando informado e omitindo quando ausente, e `payWithCustomerCredit(saleId)` (`POST /sales/:id/payments/credit`) desembrulhando `{ data }`; falham porque os métodos ainda não existem
   - Arquivos previstos: `apps/web/src/app/features/checkout/data/checkout.service.ts`, `apps/web/src/app/features/checkout/data/checkout.service.spec.ts`
 
-- [ ] **Tarefa 3 — Implementar card "Cliente da Venda [F3]" e modal de identificação de cliente na `CheckoutPage`**
+- [x] **Tarefa 3 — Implementar card "Cliente da Venda [F3]" e modal de identificação de cliente na `CheckoutPage`**
   - Cobre: CA5 (identificação de cliente no caixa + envio de `customerId` em `POST /sales`), CA7 (erro de rede e `401` ao carregar clientes), CA8 (fechar modal / `Esc` sem selecionar)
   - Teste primeiro: testes em `checkout.page.spec.ts` cobrindo abertura do modal por botão e por `F3`, filtro por nome/CPF, seleção exibindo nome/CPF/saldo verde no card lateral e enviando `customerId` em `createSale`, troca e remoção de cliente, fechamento por `Esc`/Cancelar sem alterar estado, e erro de rede ao listar clientes; falham porque o card e o modal ainda não existem
   - Arquivos previstos: `apps/web/src/app/features/checkout/pages/checkout.page.ts`, `apps/web/src/app/features/checkout/pages/checkout.page.html`, `apps/web/src/app/features/checkout/pages/checkout.page.spec.ts`
