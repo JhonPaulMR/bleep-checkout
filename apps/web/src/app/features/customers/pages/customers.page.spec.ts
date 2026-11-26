@@ -13,6 +13,7 @@ import { CustomersPage } from './customers.page';
 describe('CustomersPage', () => {
   let listSpy: ReturnType<typeof vi.fn>;
   let createSpy: ReturnType<typeof vi.fn>;
+  let addCreditSpy: ReturnType<typeof vi.fn>;
 
   const mariaCustomer: Customer = {
     id: 'cust-1',
@@ -48,18 +49,28 @@ describe('CustomersPage', () => {
         balanceCents: payload.balanceCents,
         createdAt: '2026-11-25T12:00:00.000Z',
       }),
+    addCreditImpl: (customerId: string, amountCents: number) => Observable<Customer> = (
+      customerId,
+      amountCents,
+    ) =>
+      of({
+        ...mariaCustomer,
+        id: customerId,
+        balanceCents: mariaCustomer.balanceCents + amountCents,
+      }),
   ) {
     listSpy = vi.fn().mockReturnValue(
       Array.isArray(initialCustomers) ? of(initialCustomers) : initialCustomers,
     );
     createSpy = vi.fn().mockImplementation(createImpl);
+    addCreditSpy = vi.fn().mockImplementation(addCreditImpl);
 
     TestBed.configureTestingModule({
       imports: [CustomersPage],
       providers: [
         {
           provide: CustomersService,
-          useValue: { list: listSpy, create: createSpy },
+          useValue: { list: listSpy, create: createSpy, addCredit: addCreditSpy },
         },
       ],
     });
@@ -67,7 +78,7 @@ describe('CustomersPage', () => {
     return TestBed.createComponent(CustomersPage);
   }
 
-  it('exibe estado de carregamento enquanto a lista não chega e renderiza a tabela com CPF formatado, saldo em BRL e botão + Adicionar crédito desabilitado', async () => {
+  it('exibe estado de carregamento enquanto a lista não chega e renderiza a tabela com CPF formatado, saldo em BRL e botão + Adicionar crédito habilitado', async () => {
     const list$ = new Subject<Customer[]>();
     const fixture = setup(list$);
     await fixture.whenStable();
@@ -92,8 +103,12 @@ describe('CustomersPage', () => {
       (btn) => btn.textContent?.includes('Adicionar crédito'),
     );
     expect(addCreditButtons).toHaveLength(2);
-    expect(addCreditButtons[0].disabled).toBe(true);
-    expect(addCreditButtons[1].disabled).toBe(true);
+    expect(addCreditButtons[0].disabled).toBe(false);
+    expect(addCreditButtons[0].getAttribute('data-testid')).toBe(`add-credit-${mariaCustomer.id}`);
+    expect(addCreditButtons[1].disabled).toBe(false);
+    expect(addCreditButtons[1].getAttribute('data-testid')).toBe(
+      `add-credit-${zeroBalanceCustomer.id}`,
+    );
   });
 
   it('calcula e exibe os 3 cards de resumo em tempo real', async () => {
@@ -608,6 +623,272 @@ describe('CustomersPage', () => {
     expect(el.textContent).not.toContain('Cliente Expirado');
     expect(el.textContent).not.toContain('Não foi possível conectar. Tente novamente.');
     expect(el.querySelector<HTMLButtonElement>('[data-testid="submit-customer"]')?.disabled).toBe(
+      false,
+    );
+
+    controller.verify();
+    sessionStorage.clear();
+  });
+
+  it('abre o modal de recarga com nome, saldo atual e prévia "—" e fecha por Cancelar ou X sem chamar addCredit (CA8)', async () => {
+    const fixture = setup([mariaCustomer]);
+    await fixture.whenStable();
+    const el = fixture.nativeElement as HTMLElement;
+
+    expect(el.querySelector('[data-testid="credit-modal"]')).toBeNull();
+
+    el.querySelector<HTMLButtonElement>(`[data-testid="add-credit-${mariaCustomer.id}"]`)!.click();
+    await fixture.whenStable();
+
+    const modal = el.querySelector('[data-testid="credit-modal"]');
+    expect(modal).not.toBeNull();
+    expect(modal?.getAttribute('role')).toBe('dialog');
+    expect(modal?.getAttribute('aria-modal')).toBe('true');
+    expect(modal?.textContent).toContain(`Adicionar crédito — ${mariaCustomer.name}`);
+    expect(modal?.textContent).toContain('Saldo atual');
+    expect(modal?.textContent).toContain('R$\u00a0150,00');
+
+    const preview = el.querySelector('[data-testid="credit-balance-preview"]');
+    expect(preview?.textContent?.trim()).toBe('—');
+
+    const amountInput = el.querySelector<HTMLInputElement>('[data-testid="input-credit-amount"]')!;
+    amountInput.value = '50,00';
+    amountInput.dispatchEvent(new Event('input'));
+    await fixture.whenStable();
+
+    el.querySelector<HTMLButtonElement>('[data-testid="cancel-credit-modal"]')!.click();
+    await fixture.whenStable();
+
+    expect(el.querySelector('[data-testid="credit-modal"]')).toBeNull();
+    expect(addCreditSpy).not.toHaveBeenCalled();
+
+    // Reabre e verifica que o campo foi resetado; fecha pelo X
+    el.querySelector<HTMLButtonElement>(`[data-testid="add-credit-${mariaCustomer.id}"]`)!.click();
+    await fixture.whenStable();
+
+    expect(el.querySelector<HTMLInputElement>('[data-testid="input-credit-amount"]')!.value).toBe(
+      '',
+    );
+    expect(el.querySelector('[data-testid="credit-balance-preview"]')?.textContent?.trim()).toBe(
+      '—',
+    );
+
+    el.querySelector<HTMLButtonElement>('[data-testid="close-credit-modal"]')!.click();
+    await fixture.whenStable();
+
+    expect(el.querySelector('[data-testid="credit-modal"]')).toBeNull();
+    expect(addCreditSpy).not.toHaveBeenCalled();
+  });
+
+  it('atualiza dinamicamente a prévia "Saldo após" para valor válido e exibe "—" para 0,00 ou negativo', async () => {
+    const customer250: Customer = { ...mariaCustomer, balanceCents: 25000 };
+    const fixture = setup([customer250]);
+    await fixture.whenStable();
+    const el = fixture.nativeElement as HTMLElement;
+
+    el.querySelector<HTMLButtonElement>(`[data-testid="add-credit-${customer250.id}"]`)!.click();
+    await fixture.whenStable();
+
+    const amountInput = el.querySelector<HTMLInputElement>('[data-testid="input-credit-amount"]')!;
+    const preview = el.querySelector('[data-testid="credit-balance-preview"]')!;
+    expect(preview.textContent?.trim()).toBe('—');
+
+    amountInput.value = '50,00';
+    amountInput.dispatchEvent(new Event('input'));
+    await fixture.whenStable();
+    expect(preview.textContent?.trim()).toBe('R$\u00a0300,00');
+
+    amountInput.value = '0,00';
+    amountInput.dispatchEvent(new Event('input'));
+    await fixture.whenStable();
+    expect(preview.textContent?.trim()).toBe('—');
+
+    amountInput.value = '-10,00';
+    amountInput.dispatchEvent(new Event('input'));
+    await fixture.whenStable();
+    expect(preview.textContent?.trim()).toBe('—');
+  });
+
+  it('bloqueia envio e exibe erro inline com borda border-perigo para vazio, 0,00 e -10,00 (CA2)', async () => {
+    const fixture = setup([mariaCustomer]);
+    await fixture.whenStable();
+    const el = fixture.nativeElement as HTMLElement;
+
+    el.querySelector<HTMLButtonElement>(`[data-testid="add-credit-${mariaCustomer.id}"]`)!.click();
+    await fixture.whenStable();
+
+    const amountInput = el.querySelector<HTMLInputElement>('[data-testid="input-credit-amount"]')!;
+    const form = el.querySelector<HTMLFormElement>('[data-testid="credit-modal"] form')!;
+
+    // Vazio
+    form.dispatchEvent(new Event('submit'));
+    await fixture.whenStable();
+
+    expect(addCreditSpy).not.toHaveBeenCalled();
+    expect(el.textContent).toContain('Informe um valor maior que zero. O saldo não foi alterado.');
+    expect(amountInput.classList.contains('border-perigo')).toBe(true);
+
+    // Zero
+    amountInput.value = '0,00';
+    amountInput.dispatchEvent(new Event('input'));
+    await fixture.whenStable();
+    form.dispatchEvent(new Event('submit'));
+    await fixture.whenStable();
+
+    expect(addCreditSpy).not.toHaveBeenCalled();
+    expect(el.textContent).toContain('Informe um valor maior que zero. O saldo não foi alterado.');
+    expect(amountInput.classList.contains('border-perigo')).toBe(true);
+
+    // Negativo
+    amountInput.value = '-10,00';
+    amountInput.dispatchEvent(new Event('input'));
+    await fixture.whenStable();
+    form.dispatchEvent(new Event('submit'));
+    await fixture.whenStable();
+
+    expect(addCreditSpy).not.toHaveBeenCalled();
+    expect(el.textContent).toContain('Informe um valor maior que zero. O saldo não foi alterado.');
+    expect(amountInput.classList.contains('border-perigo')).toBe(true);
+  });
+
+  it('envia recarga válida, exibe estado "Adicionando...", atualiza saldo na tabela e no card Total em Créditos Ativos e fecha o modal (CA1)', async () => {
+    const addCredit$ = new Subject<Customer>();
+    const fixture = setup([mariaCustomer, joaoCustomer], undefined, () => addCredit$);
+    await fixture.whenStable();
+    const el = fixture.nativeElement as HTMLElement;
+
+    el.querySelector<HTMLButtonElement>(`[data-testid="add-credit-${mariaCustomer.id}"]`)!.click();
+    await fixture.whenStable();
+
+    const amountInput = el.querySelector<HTMLInputElement>('[data-testid="input-credit-amount"]')!;
+    const submitButton = el.querySelector<HTMLButtonElement>('[data-testid="submit-credit"]')!;
+    const cancelButton = el.querySelector<HTMLButtonElement>('[data-testid="cancel-credit-modal"]')!;
+    const closeButton = el.querySelector<HTMLButtonElement>('[data-testid="close-credit-modal"]')!;
+    const form = el.querySelector<HTMLFormElement>('[data-testid="credit-modal"] form')!;
+
+    amountInput.value = '50,00';
+    amountInput.dispatchEvent(new Event('input'));
+    await fixture.whenStable();
+
+    form.dispatchEvent(new Event('submit'));
+    await fixture.whenStable();
+
+    expect(addCreditSpy).toHaveBeenCalledTimes(1);
+    expect(addCreditSpy).toHaveBeenCalledWith(mariaCustomer.id, 5000);
+    expect(submitButton.disabled).toBe(true);
+    expect(submitButton.textContent).toContain('Adicionando...');
+    expect(cancelButton.disabled).toBe(true);
+    expect(closeButton.disabled).toBe(true);
+
+    // Tentativa de fechar durante creditSaving não fecha
+    closeButton.click();
+    await fixture.whenStable();
+    expect(el.querySelector('[data-testid="credit-modal"]')).not.toBeNull();
+
+    addCredit$.next({
+      ...mariaCustomer,
+      balanceCents: 20000,
+    });
+    addCredit$.complete();
+    await fixture.whenStable();
+
+    expect(el.querySelector('[data-testid="credit-modal"]')).toBeNull();
+    // Maria (200,00) + João (50,50) = 250,50
+    expect(el.querySelector('[data-testid="stat-total-credit"]')?.textContent?.trim()).toBe(
+      'R$\u00a0250,50',
+    );
+    const mariaRow = Array.from(el.querySelectorAll('tbody tr')).find((row) =>
+      row.textContent?.includes('Maria Silva'),
+    );
+    expect(mariaRow?.textContent).toContain('R$\u00a0200,00');
+  });
+
+  it('falha de rede na recarga exibe mensagem de conexão, mantém valor digitado e retira carregamento (CA7)', async () => {
+    const fixture = setup([mariaCustomer], undefined, () =>
+      throwError(() => new HttpErrorResponse({ status: 0, statusText: 'Unknown Error' })),
+    );
+    await fixture.whenStable();
+    const el = fixture.nativeElement as HTMLElement;
+
+    el.querySelector<HTMLButtonElement>(`[data-testid="add-credit-${mariaCustomer.id}"]`)!.click();
+    await fixture.whenStable();
+
+    const amountInput = el.querySelector<HTMLInputElement>('[data-testid="input-credit-amount"]')!;
+    const submitButton = el.querySelector<HTMLButtonElement>('[data-testid="submit-credit"]')!;
+    const form = el.querySelector<HTMLFormElement>('[data-testid="credit-modal"] form')!;
+
+    amountInput.value = '50,00';
+    amountInput.dispatchEvent(new Event('input'));
+    await fixture.whenStable();
+
+    form.dispatchEvent(new Event('submit'));
+    await fixture.whenStable();
+
+    expect(el.querySelector('[data-testid="credit-modal"]')).not.toBeNull();
+    expect(submitButton.disabled).toBe(false);
+    expect(submitButton.textContent).toContain('Adicionar crédito');
+    expect(amountInput.value).toBe('50,00');
+    expect(el.querySelector('[role="alert"]')?.textContent).toContain(
+      'Não foi possível conectar. Tente novamente.',
+    );
+  });
+
+  it('401 na recarga dispara authInterceptor, limpa sessão, leva ao login com aviso e mantém saldo inalterado (CA6)', async () => {
+    sessionStorage.clear();
+    TestBed.configureTestingModule({
+      imports: [CustomersPage],
+      providers: [
+        provideRouter([]),
+        provideHttpClient(withInterceptors([authInterceptor])),
+        provideHttpClientTesting(),
+      ],
+    });
+
+    const controller = TestBed.inject(HttpTestingController);
+    const auth = TestBed.inject(AuthService);
+    const idle = TestBed.inject(IdleSessionService);
+    const apiUrl = TestBed.inject(API_URL);
+    const navigate = vi.spyOn(TestBed.inject(Router), 'navigateByUrl').mockResolvedValue(true);
+
+    auth.startSession('expired-token', { name: 'Gerente', role: 'MANAGER' });
+
+    const fixture = TestBed.createComponent(CustomersPage);
+    fixture.detectChanges();
+
+    const listReq = controller.expectOne(`${apiUrl}/customers`);
+    listReq.flush({ data: [mariaCustomer] });
+    await fixture.whenStable();
+
+    const el = fixture.nativeElement as HTMLElement;
+    el.querySelector<HTMLButtonElement>(`[data-testid="add-credit-${mariaCustomer.id}"]`)!.click();
+    await fixture.whenStable();
+
+    const amountInput = el.querySelector<HTMLInputElement>('[data-testid="input-credit-amount"]')!;
+    const form = el.querySelector<HTMLFormElement>('[data-testid="credit-modal"] form')!;
+
+    amountInput.value = '50,00';
+    amountInput.dispatchEvent(new Event('input'));
+    await fixture.whenStable();
+
+    form.dispatchEvent(new Event('submit'));
+
+    const creditReq = controller.expectOne(`${apiUrl}/customers/${mariaCustomer.id}/credits`);
+    expect(creditReq.request.method).toBe('POST');
+    expect(creditReq.request.body).toEqual({ amountCents: 5000 });
+    creditReq.flush(
+      { statusCode: 401, message: 'Unauthorized' },
+      { status: 401, statusText: 'Unauthorized' },
+    );
+    await fixture.whenStable();
+
+    expect(auth.isAuthenticated()).toBe(false);
+    expect(idle.expired()).toBe(true);
+    expect(navigate).toHaveBeenCalledWith('/login');
+    expect(el.textContent).not.toContain('Não foi possível conectar. Tente novamente.');
+    expect(el.querySelector('[data-testid="stat-total-credit"]')?.textContent?.trim()).toBe(
+      'R$\u00a0150,00',
+    );
+    expect(el.querySelector<HTMLButtonElement>('[data-testid="submit-credit"]')?.disabled).toBe(
       false,
     );
 

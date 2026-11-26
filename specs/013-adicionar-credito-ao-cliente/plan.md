@@ -22,7 +22,7 @@
   - Teste primeiro: teste unitário em `customers.service.spec.ts` verificando que `addCredit(id, amountCents)` faz `POST /customers/:id/credits` com `{ amountCents }` e desembrulha `{ data }`; falha porque o método ainda não existe
   - Arquivos previstos: `apps/web/src/app/features/customers/data/customers.service.ts`, `apps/web/src/app/features/customers/data/customers.service.spec.ts`
 
-- [ ] **Tarefa 3 — Habilitar "+ Adicionar crédito" e implementar modal de recarga com prévia, validação inline e tratamento de erros na tela de Clientes**
+- [x] **Tarefa 3 — Habilitar "+ Adicionar crédito" e implementar modal de recarga com prévia, validação inline e tratamento de erros na tela de Clientes**
   - Cobre: CA1 (interface), CA2 (validação inline), CA6 (`401` via `authInterceptor`), CA7 (falha de rede), CA8 (cancelamento sem alterar saldo)
   - Teste primeiro: testes unitários em `customers.page.spec.ts` verificando botão `+ Adicionar crédito` habilitado, abertura do modal com nome e saldo atual, prévia "Saldo após" atualizada dinamicamente (ou `—` se inválido), bloqueio e mensagem `"Informe um valor maior que zero. O saldo não foi alterado."` para vazio/zero/negativo, envio válido atualizando saldo na tabela e cards de resumo, cancelamento sem chamar `addCredit`, erro de rede exibindo `"Não foi possível conectar. Tente novamente."` mantendo valor, e teste integrado de `401` com `authInterceptor` levando ao `/login`; falham porque o botão está desabilitado e o modal de recarga não existe
   - Arquivos previstos: `apps/web/src/app/features/customers/pages/customers.page.ts`, `apps/web/src/app/features/customers/pages/customers.page.html`, `apps/web/src/app/features/customers/pages/customers.page.spec.ts`

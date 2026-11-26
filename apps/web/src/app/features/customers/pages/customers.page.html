@@ -167,12 +167,12 @@
                     </span>
                   </td>
                   <td class="px-lg py-md text-right">
-                    <!-- TODO #13: recarga de crédito do cliente entra na US12 -->
                     <button
                       type="button"
-                      [disabled]="addCreditDisabled"
+                      [attr.data-testid]="'add-credit-' + customer.id"
                       aria-label="Adicionar crédito"
-                      class="inline-flex items-center gap-xs rounded-lg border border-desabilitado px-sm py-xs text-legenda text-texto-suave disabled:cursor-not-allowed disabled:opacity-50"
+                      (click)="openCreditModal(customer)"
+                      class="inline-flex items-center gap-xs rounded-lg bg-primaria px-sm py-xs text-legenda font-semibold text-superficie transition-colors hover:brightness-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primaria"
                     >
                       <span class="material-symbols-outlined text-[18px]" aria-hidden="true">
                         add_card
@@ -344,6 +344,129 @@
                 Salvando...
               } @else {
                 Salvar
+              }
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  }
+
+  @if (creditModalCustomer(); as target) {
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="credit-modal-title"
+      data-testid="credit-modal"
+      class="fixed inset-0 z-50 flex items-center justify-center bg-texto/40 p-md backdrop-blur-sm"
+    >
+      <div
+        class="w-full max-w-lg rounded-2xl border border-desabilitado/60 bg-superficie p-lg shadow-xl"
+      >
+        <div class="mb-lg flex items-start justify-between gap-md">
+          <div class="flex items-start gap-sm">
+            <div
+              class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primaria/10 text-primaria"
+            >
+              <span class="material-symbols-outlined" aria-hidden="true">add_card</span>
+            </div>
+            <div>
+              <h2 id="credit-modal-title" class="text-titulo-secao text-texto">
+                Adicionar crédito — {{ target.name }}
+              </h2>
+              <p class="mt-xs text-legenda text-texto-suave">
+                Insira o valor para recarga de saldo do cliente
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            aria-label="Fechar modal"
+            data-testid="close-credit-modal"
+            [disabled]="creditSaving()"
+            (click)="closeCreditModal()"
+            class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-texto-suave transition-colors hover:bg-fundo hover:text-texto focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primaria disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <span class="material-symbols-outlined text-[20px]" aria-hidden="true">close</span>
+          </button>
+        </div>
+
+        <div class="mb-md flex items-center justify-between rounded-xl bg-fundo p-md">
+          <div>
+            <p class="text-corpo-destaque text-texto">Saldo atual</p>
+            <p class="text-legenda text-texto-suave">Disponível para compras</p>
+          </div>
+          <p class="text-valor-destaque text-sucesso">
+            {{ formatBalance(target.balanceCents) }}
+          </p>
+        </div>
+
+        <form novalidate class="flex flex-col gap-md" (ngSubmit)="submitCredit()">
+          <div class="flex flex-col gap-xs">
+            <label for="credit-amount" class="text-corpo-destaque text-texto">
+              Valor a adicionar (R$) <span class="text-perigo">*</span>
+            </label>
+            <input
+              id="credit-amount"
+              type="text"
+              name="creditAmount"
+              inputmode="decimal"
+              data-testid="input-credit-amount"
+              placeholder="0,00"
+              [ngModel]="creditAmount()"
+              (ngModelChange)="creditAmount.set($event)"
+              class="rounded-xl bg-superficie px-md py-sm text-corpo text-texto placeholder:text-texto-suave focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primaria"
+              [class.border]="!(creditSubmitted() && creditAmountError())"
+              [class.border-2]="creditSubmitted() && creditAmountError()"
+              [class.border-perigo]="creditSubmitted() && creditAmountError()"
+              [class.border-desabilitado]="!(creditSubmitted() && creditAmountError())"
+            />
+            @if (creditSubmitted() && creditAmountError(); as message) {
+              <p class="inline-flex items-center gap-xs text-legenda text-perigo" role="alert">
+                <span class="material-symbols-outlined text-[16px]" aria-hidden="true">error</span>
+                <span>{{ message }}</span>
+              </p>
+            }
+          </div>
+
+          <div
+            class="flex items-center justify-between rounded-xl border border-desabilitado/60 bg-fundo p-md"
+          >
+            <span class="text-corpo text-texto-suave">Saldo após:</span>
+            <span
+              data-testid="credit-balance-preview"
+              class="text-corpo-destaque"
+              [class.text-sucesso]="creditPreviewBalance() !== '—'"
+              [class.text-texto-suave]="creditPreviewBalance() === '—'"
+            >
+              {{ creditPreviewBalance() }}
+            </span>
+          </div>
+
+          @if (creditSubmitError(); as message) {
+            <p class="text-legenda text-perigo" role="alert">{{ message }}</p>
+          }
+
+          <div class="mt-sm flex items-center justify-end gap-sm">
+            <button
+              type="button"
+              data-testid="cancel-credit-modal"
+              [disabled]="creditSaving()"
+              (click)="closeCreditModal()"
+              class="rounded-xl border border-desabilitado px-lg py-sm text-corpo-destaque text-texto transition-colors hover:bg-fundo focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primaria disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              data-testid="submit-credit"
+              [disabled]="creditSaving()"
+              class="rounded-xl bg-primaria px-lg py-sm text-corpo-destaque text-superficie shadow-sm transition-colors hover:brightness-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primaria disabled:cursor-not-allowed disabled:bg-desabilitado"
+            >
+              @if (creditSaving()) {
+                Adicionando...
+              } @else {
+                Adicionar crédito
               }
             </button>
           </div>
