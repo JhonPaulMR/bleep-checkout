@@ -109,6 +109,13 @@ export class CheckoutPage {
   protected readonly lookingUpBarcode = signal(false);
   protected readonly barcodeError = signal<string | null>(null);
 
+  protected readonly searchModalOpen = signal(false);
+  protected readonly searchTerm = signal('');
+  protected readonly searchResults = signal<Product[]>([]);
+  protected readonly searchingProducts = signal(false);
+  protected readonly searchError = signal<string | null>(null);
+  protected readonly hasSearched = signal(false);
+
   protected readonly cart = signal<CartItem[]>([]);
   protected readonly cartTotalCents = computed(() =>
     this.cart().reduce((sum, item) => sum + item.product.priceCents * item.quantity, 0),
@@ -151,7 +158,13 @@ export class CheckoutPage {
   }
 
   protected onWindowKeydown(event: KeyboardEvent): void {
-    if (event.key === 'F4' && !this.sale()) {
+    if (event.key === 'Escape' && this.searchModalOpen()) {
+      event.preventDefault();
+      this.closeSearchModal();
+      return;
+    }
+
+    if (event.key === 'F4' && !this.sale() && !this.searchModalOpen()) {
       event.preventDefault();
       this.focusBarcodeInput();
     }
@@ -197,7 +210,43 @@ export class CheckoutPage {
   }
 
   protected openSearchModal(): void {
-    // Modal de busca por nome será implementado na Tarefa 4.
+    this.searchTerm.set('');
+    this.searchResults.set([]);
+    this.searchError.set(null);
+    this.hasSearched.set(false);
+    this.searchModalOpen.set(true);
+    this.runProductSearch();
+  }
+
+  protected closeSearchModal(): void {
+    this.searchModalOpen.set(false);
+    this.focusBarcodeInput();
+  }
+
+  protected runProductSearch(): void {
+    if (this.searchingProducts()) return;
+
+    this.searchError.set(null);
+    this.searchingProducts.set(true);
+
+    this.checkoutService.searchProducts(this.searchTerm()).subscribe({
+      next: (products) => {
+        this.searchingProducts.set(false);
+        this.searchResults.set(products);
+        this.hasSearched.set(true);
+      },
+      error: (err: unknown) => {
+        this.searchingProducts.set(false);
+        if (err instanceof HttpErrorResponse && err.status === 401) return;
+        this.searchError.set(NETWORK_ERROR_MESSAGE);
+      },
+    });
+  }
+
+  protected selectSearchedProduct(product: Product): void {
+    // TODO #5: quantidade prévia configurável entra na US04
+    this.addProduct(product);
+    this.closeSearchModal();
   }
 
   protected addProduct(product: Product): void {
