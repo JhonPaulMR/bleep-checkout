@@ -301,4 +301,192 @@ describe('Produtos — POST /products e GET /products (e2e)', () => {
         .expect(401);
     });
   });
+
+  describe('GET /products/barcode/:barcode', () => {
+    it('retorna 200 com o produto ativo para OPERATOR', async () => {
+      const managerToken = await login(
+        process.env.SEED_MANAGER_EMAIL!,
+        process.env.SEED_MANAGER_PASSWORD!,
+      );
+      const operatorToken = await login(
+        process.env.SEED_OPERATOR_EMAIL!,
+        process.env.SEED_OPERATOR_PASSWORD!,
+      );
+      const barcode = uniqueBarcode(10);
+      createdBarcodes.push(barcode);
+
+      await request(app.getHttpServer())
+        .post('/products')
+        .set('Authorization', `Bearer ${managerToken}`)
+        .send({
+          name: 'Café Torrado 500g',
+          barcode,
+          priceCents: 1890,
+        })
+        .expect(201);
+
+      const res = await request(app.getHttpServer())
+        .get(`/products/barcode/${barcode}`)
+        .set('Authorization', `Bearer ${operatorToken}`)
+        .expect(200);
+
+      expect(res.body.data).toEqual({
+        id: expect.any(String),
+        name: 'Café Torrado 500g',
+        barcode,
+        priceCents: 1890,
+        active: true,
+        createdAt: expect.any(String),
+      });
+    });
+
+    it('retorna 404 com "Produto não localizado." para código inexistente', async () => {
+      const operatorToken = await login(
+        process.env.SEED_OPERATOR_EMAIL!,
+        process.env.SEED_OPERATOR_PASSWORD!,
+      );
+      const barcode = uniqueBarcode(11);
+
+      const res = await request(app.getHttpServer())
+        .get(`/products/barcode/${barcode}`)
+        .set('Authorization', `Bearer ${operatorToken}`)
+        .expect(404);
+
+      expect(res.body.statusCode).toBe(404);
+      expect(res.body.message).toBe('Produto não localizado.');
+      expect(res.body.path).toBe(`/products/barcode/${barcode}`);
+    });
+
+    it('retorna 404 com "Produto não localizado." para produto desativado', async () => {
+      const operatorToken = await login(
+        process.env.SEED_OPERATOR_EMAIL!,
+        process.env.SEED_OPERATOR_PASSWORD!,
+      );
+      const barcode = uniqueBarcode(12);
+      createdBarcodes.push(barcode);
+
+      await prisma.product.create({
+        data: {
+          name: 'Produto Desativado Barcode',
+          barcode,
+          priceCents: 990,
+          active: false,
+        },
+      });
+
+      const res = await request(app.getHttpServer())
+        .get(`/products/barcode/${barcode}`)
+        .set('Authorization', `Bearer ${operatorToken}`)
+        .expect(404);
+
+      expect(res.body.statusCode).toBe(404);
+      expect(res.body.message).toBe('Produto não localizado.');
+    });
+
+    it('retorna 403 para MANAGER', async () => {
+      const managerToken = await login(
+        process.env.SEED_MANAGER_EMAIL!,
+        process.env.SEED_MANAGER_PASSWORD!,
+      );
+      const barcode = uniqueBarcode(13);
+
+      const res = await request(app.getHttpServer())
+        .get(`/products/barcode/${barcode}`)
+        .set('Authorization', `Bearer ${managerToken}`)
+        .expect(403);
+
+      expect(res.body.statusCode).toBe(403);
+    });
+
+    it('retorna 401 sem token ou com token inválido', async () => {
+      const barcode = uniqueBarcode(14);
+
+      await request(app.getHttpServer())
+        .get(`/products/barcode/${barcode}`)
+        .expect(401);
+
+      await request(app.getHttpServer())
+        .get(`/products/barcode/${barcode}`)
+        .set('Authorization', 'Bearer token-invalido')
+        .expect(401);
+    });
+  });
+
+  describe('GET /products?search=<termo>', () => {
+    it('filtra por nome case-insensitive retornando apenas ativos para OPERATOR e [] sem correspondência', async () => {
+      const operatorToken = await login(
+        process.env.SEED_OPERATOR_EMAIL!,
+        process.env.SEED_OPERATOR_PASSWORD!,
+      );
+      const activeBarcode = uniqueBarcode(20);
+      const inactiveBarcode = uniqueBarcode(21);
+      createdBarcodes.push(activeBarcode, inactiveBarcode);
+
+      await prisma.product.createMany({
+        data: [
+          {
+            name: 'Achocolatado ZxQ9 Ativo',
+            barcode: activeBarcode,
+            priceCents: 890,
+            active: true,
+          },
+          {
+            name: 'Achocolatado ZxQ9 Inativo',
+            barcode: inactiveBarcode,
+            priceCents: 790,
+            active: false,
+          },
+        ],
+      });
+
+      const matchRes = await request(app.getHttpServer())
+        .get('/products?search=zxq9')
+        .set('Authorization', `Bearer ${operatorToken}`)
+        .expect(200);
+
+      expect(matchRes.body.data).toHaveLength(1);
+      expect(matchRes.body.data[0].barcode).toBe(activeBarcode);
+
+      const emptyRes = await request(app.getHttpServer())
+        .get('/products?search=naoexiste998877')
+        .set('Authorization', `Bearer ${operatorToken}`)
+        .expect(200);
+
+      expect(emptyRes.body.data).toEqual([]);
+    });
+
+    it('permite que MANAGER também filtre por ?search= incluindo inativos', async () => {
+      const managerToken = await login(
+        process.env.SEED_MANAGER_EMAIL!,
+        process.env.SEED_MANAGER_PASSWORD!,
+      );
+      const activeBarcode = uniqueBarcode(22);
+      const inactiveBarcode = uniqueBarcode(23);
+      createdBarcodes.push(activeBarcode, inactiveBarcode);
+
+      await prisma.product.createMany({
+        data: [
+          {
+            name: 'Suco Klm8 Ativo',
+            barcode: activeBarcode,
+            priceCents: 650,
+            active: true,
+          },
+          {
+            name: 'Suco Klm8 Inativo',
+            barcode: inactiveBarcode,
+            priceCents: 550,
+            active: false,
+          },
+        ],
+      });
+
+      const res = await request(app.getHttpServer())
+        .get('/products?search=klm8')
+        .set('Authorization', `Bearer ${managerToken}`)
+        .expect(200);
+
+      expect(res.body.data).toHaveLength(2);
+    });
+  });
 });

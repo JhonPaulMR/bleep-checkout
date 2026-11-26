@@ -1,7 +1,9 @@
-import { Body, Controller, Get, Post, Req } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query, Req } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiOperation,
+  ApiParam,
+  ApiQuery,
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
@@ -38,12 +40,16 @@ export class ProductsController {
     return this.products.create(body);
   }
 
-  // TODO #4: expandir listagem mínima de produtos ativos no caixa com busca e código de barras
   @Get()
   @Roles(Role.MANAGER, Role.OPERATOR)
   @ApiOperation({
     summary:
       'Lista produtos do catálogo (gerente) ou ativos disponíveis para venda no caixa (operador)',
+  })
+  @ApiQuery({
+    name: 'search',
+    required: false,
+    description: 'Filtro parcial por nome do produto (case-insensitive)',
   })
   @ApiResponse({ status: 200, description: 'Lista de produtos' })
   @ApiResponse({
@@ -54,7 +60,33 @@ export class ProductsController {
     status: 403,
     description: 'Acesso permitido apenas para gerentes ou operadores de caixa',
   })
-  list(@Req() request: { user: JwtPayload }) {
-    return this.products.listForRole(request.user.role);
+  list(@Req() request: { user: JwtPayload }, @Query('search') search?: string) {
+    return this.products.listForRole(request.user.role, search);
+  }
+
+  @Get('barcode/:barcode')
+  @Roles(Role.OPERATOR)
+  @ApiOperation({
+    summary: 'Busca produto ativo pelo código de barras para inclusão no caixa',
+  })
+  @ApiParam({
+    name: 'barcode',
+    description: 'Código de barras do produto',
+  })
+  @ApiResponse({ status: 200, description: 'Produto ativo encontrado' })
+  @ApiResponse({
+    status: 401,
+    description: 'Sessão ausente, inválida ou expirada',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Acesso permitido apenas para operadores de caixa',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Produto não localizado.',
+  })
+  findByBarcode(@Param('barcode') barcode: string) {
+    return this.products.findActiveByBarcode(barcode);
   }
 }

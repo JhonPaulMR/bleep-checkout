@@ -1,7 +1,7 @@
 # 🛠️ Architecture / Software Design Document
 
 **Projeto:** Bleep Checkout
-**Versão:** 1.0.8 · fechamento da US12 (recarga de crédito do cliente)
+**Versão:** 1.0.9 · fechamento da US03 (montagem de venda no simulador de caixa)
 **Última atualização:** 26/11/2026
 
 > 🤖 **O `prd.md` responde _o quê_ o produto faz. Este responde _onde as coisas
@@ -315,7 +315,7 @@ stateDiagram-v2
 | :------ | :------------- | :---- | :----------------- | :-- |
 | Autenticação | `apps/api/src/modules/auth` | `JwtAuthGuard` global (`@Public()` em `/auth/login`) | `UsersService` / `PrismaService` | US09 (#10) |
 | Usuários / Operadores | `apps/api/src/modules/users` | `JwtAuthGuard` + `RolesGuard` (`@Roles(Role.MANAGER)` em `POST/GET /users`; regra de dono em `GET /users/:id`) | `UsersService` / `PrismaService` | US10 (#11) |
-| Produtos | `apps/api/src/modules/products` | `JwtAuthGuard` + `RolesGuard` (`@Roles(Role.MANAGER)` em `POST /products`; `@Roles(Role.MANAGER, Role.OPERATOR)` em `GET /products`) | `ProductsService` / `PrismaService` | US01 (#1), US06 (#3) |
+| Produtos | `apps/api/src/modules/products` | `JwtAuthGuard` + `RolesGuard` (`@Roles(Role.MANAGER)` em `POST /products`; `@Roles(Role.MANAGER, Role.OPERATOR)` em `GET /products` com `?search=`; `@Roles(Role.OPERATOR)` em `GET /products/barcode/:barcode`) | `ProductsService` / `PrismaService` | US01 (#1), US03 (#4), US06 (#3) |
 | Clientes | `apps/api/src/modules/customers` | `JwtAuthGuard` + `RolesGuard` (`@Roles(Role.MANAGER)` em `POST /customers` e `POST /customers/:id/credits`; `@Roles(Role.MANAGER, Role.OPERATOR)` em `GET /customers`) | `CustomersService` / `PrismaService` | US02 (#2), US12 (#13) |
 | Vendas | `apps/api/src/modules/sales` | `JwtAuthGuard` + `RolesGuard` (`@Roles(Role.OPERATOR)` em `POST /sales` e `GET /sales/:id`; regra de dono `operatorId === sub`) | `SalesService` / `PrismaService` | US06 (#3) |
 | Pagamentos | `apps/api/src/modules/payments` | `JwtAuthGuard` + `RolesGuard` (`@Roles(Role.OPERATOR)` em `GET /payments/config` e `POST /sales/:id/payments/card\|pix`; regra de dono) | `PaymentsService` / `PrismaService` + `PaymentGateway` | US06 (#3) |
@@ -336,6 +336,7 @@ stateDiagram-v2
 | 25/11/2026 | 1.0.6 | Fechamento da US01 (#1): cadastro de produtos (`POST /products` para `MANAGER`, `GET /products` para `MANAGER` e `OPERATOR`), tela de Produtos e cabeçalho alinhados ao protótipo navegável |
 | 25/11/2026 | 1.0.7 | Fechamento da US02 (#2): migration de `Customer`, `CreditTransaction` e `Sale.customerId`, API `POST/GET /customers` com transação `INITIAL`, e tela de Clientes fiel ao protótipo navegável |
 | 26/11/2026 | 1.0.8 | Fechamento da US12 (#13): recarga de crédito (`POST /customers/:id/credits` com incremento atômico e `CreditTransaction` `TOP_UP`) e modal de recarga habilitado na tela de Clientes |
+| 26/11/2026 | 1.0.9 | Fechamento da US03 (#4): consulta por código de barras (`GET /products/barcode/:barcode`), filtro `?search=` em `GET /products` e simulador de caixa/modal de busca fiéis a `caixa.html` e `busca.html` |
 
 ---
 

@@ -1,4 +1,9 @@
-import { ConflictException, Injectable } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import type { Prisma } from '../../../generated/prisma/client.js';
 import { Role } from '../../../generated/prisma/enums.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { CreateProductDto } from './dto/create-product.dto.js';
@@ -41,17 +46,34 @@ export class ProductsService {
     }
   }
 
-  listForRole(role: string) {
-    if (role === Role.MANAGER) {
-      return this.prisma.product.findMany({
-        orderBy: { name: 'asc' },
-      });
+  listForRole(role: string, search?: string) {
+    const where: Prisma.ProductWhereInput = {};
+
+    if (role !== Role.MANAGER) {
+      where.active = true;
     }
 
-    return this.findActive();
+    const term = search?.trim();
+    if (term) {
+      where.name = { contains: term, mode: 'insensitive' };
+    }
+
+    return this.prisma.product.findMany({
+      ...(Object.keys(where).length > 0 ? { where } : {}),
+      orderBy: { name: 'asc' },
+    });
   }
 
-  // TODO #4: expandir listagem mínima de produtos ativos no caixa com busca e código de barras
+  async findActiveByBarcode(barcode: string) {
+    const product = await this.prisma.product.findFirst({
+      where: { barcode: barcode.trim(), active: true },
+    });
+    if (!product) {
+      throw new NotFoundException('Produto não localizado.');
+    }
+    return product;
+  }
+
   findActive() {
     return this.prisma.product.findMany({
       where: { active: true },
