@@ -6,6 +6,7 @@ import {
   UnprocessableEntityException,
 } from '@nestjs/common';
 import {
+  CreditType,
   PaymentMethod,
   PaymentStatus,
   SaleStatus,
@@ -175,6 +176,106 @@ export class PaymentsService {
       });
 
       return { payment: updatedPayment, sale: updatedSale };
+    });
+  }
+
+  async payWithCustomerCredit(saleId: string, operatorId: string) {
+    const sale = await this.prisma.sale.findUnique({
+      where: { id: saleId },
+    });
+
+    if (!sale) {
+      throw new NotFoundException('Venda não encontrada.');
+    }
+
+    if (sale.operatorId !== operatorId) {
+      throw new ForbiddenException(
+        'Você não tem permissão para cobrar esta venda.',
+      );
+    }
+
+    if (sale.status !== SaleStatus.OPEN || sale.totalCents <= 0) {
+      throw new UnprocessableEntityException(
+        'Venda não está aberta para pagamento.',
+      );
+    }
+
+    if (!sale.customerId) {
+      throw new UnprocessableEntityException(
+        'Selecione um cliente para pagar com crédito.',
+      );
+    }
+
+    const customerId = sale.customerId;
+
+    return this.prisma.$transaction(async (tx) => {
+      const debited = await tx.customer.updateMany({
+        where: {
+          id: customerId,
+          balanceCents: { gte: sale.totalCents },
+        },
+        data: {
+          balanceCents: { decrement: sale.totalCents },
+        },
+      });
+
+      if (debited.count === 0) {
+        throw new UnprocessableEntityException('Saldo insuficiente.');
+      }
+
+      const updatedSaleCount = await tx.sale.updateMany({
+        where: {
+          id: sale.id,
+          status: SaleStatus.OPEN,
+        },
+        data: {
+          status: SaleStatus.COMPLETED,
+          completedAt: new Date(),
+        },
+      });
+
+      if (updatedSaleCount.count === 0) {
+        throw new UnprocessableEntityException(
+          'Venda não está aberta para pagamento.',
+        );
+      }
+
+      const payment = await tx.payment.create({
+        data: {
+          saleId: sale.id,
+          method: PaymentMethod.CUSTOMER_CREDIT,
+          status: PaymentStatus.APPROVED,
+          amountCents: sale.totalCents,
+        },
+      });
+
+      await tx.creditTransaction.create({
+        data: {
+          customerId,
+          saleId: sale.id,
+          type: CreditType.SALE_DEBIT,
+          amountCents: sale.totalCents,
+        },
+      });
+
+      const updatedCustomer = await tx.customer.findUniqueOrThrow({
+        where: { id: customerId },
+      });
+
+      const updatedSale = await tx.sale.findUniqueOrThrow({
+        where: { id: sale.id },
+        include: {
+          items: { include: { product: true } },
+          payments: true,
+          customer: true,
+        },
+      });
+
+      return {
+        sale: updatedSale,
+        payment,
+        customerBalanceCents: updatedCustomer.balanceCents,
+      };
     });
   }
 

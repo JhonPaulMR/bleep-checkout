@@ -104,4 +104,34 @@ export class PaymentsController {
   ) {
     return this.payments.payWithPix(saleId, request.user.sub);
   }
+
+  @Post('sales/:id/payments/credit')
+  @Roles(Role.OPERATOR)
+  @ApiOperation({
+    summary: 'Paga uma venda em aberto usando o crédito do cliente vinculado',
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Débito de crédito aprovado e venda concluída',
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Sessão ausente, inválida ou expirada',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Acesso negado para outro operador ou gerente',
+  })
+  @ApiResponse({ status: 404, description: 'Venda não encontrada.' })
+  @ApiResponse({
+    status: 422,
+    description:
+      'Saldo insuficiente, cliente não selecionado ou venda não está aberta para pagamento.',
+  })
+  payWithCustomerCredit(
+    @Param('id') saleId: string,
+    @Req() request: { user: JwtPayload },
+  ) {
+    return this.payments.payWithCustomerCredit(saleId, request.user.sub);
+  }
 }

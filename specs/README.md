@@ -10,5 +10,6 @@
 | #13 | [013-adicionar-credito-ao-cliente](013-adicionar-credito-ao-cliente/spec.md) | implementada | US12 — Adicionar crédito ao cliente |
 | #4 | [004-montar-venda-no-simulador-de-caixa](004-montar-venda-no-simulador-de-caixa/spec.md) | implementada | US03 — Montar venda no simulador de caixa |
 | #5 | [005-inserir-quantidade-de-produtos-na-venda](005-inserir-quantidade-de-produtos-na-venda/spec.md) | implementada | US04 — Inserir quantidade de produtos na venda |
+| #7 | [007-pagar-com-credito-do-cliente](007-pagar-com-credito-do-cliente/spec.md) | implementada | US05 — Pagar com crédito do cliente |
 
 Estados: `rascunho` · `aprovada` · `implementada` · `bloqueada`

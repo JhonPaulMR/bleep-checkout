@@ -53,6 +53,14 @@ export interface Payment {
   createdAt: string;
 }
 
+export interface CheckoutCustomer {
+  id: string;
+  name: string;
+  cpf: string;
+  balanceCents: number;
+  createdAt?: string;
+}
+
 export interface Sale {
   id: string;
   number: number;
@@ -61,6 +69,8 @@ export interface Sale {
   totalCents: number;
   createdAt: string;
   completedAt: string | null;
+  customerId?: string | null;
+  customer?: CheckoutCustomer | null;
   items?: SaleItem[];
   payments?: Payment[];
 }
@@ -90,6 +100,12 @@ export interface PaymentResponse {
   sale: Sale;
 }
 
+export interface CustomerCreditPaymentResult {
+  sale: Sale;
+  payment: Payment;
+  customerBalanceCents: number;
+}
+
 @Injectable({ providedIn: 'root' })
 export class CheckoutService {
   private readonly http = inject(HttpClient);
@@ -98,6 +114,12 @@ export class CheckoutService {
   listProducts(): Observable<Product[]> {
     return this.http
       .get<{ data: Product[] }>(`${this.apiUrl}/products`)
+      .pipe(map((response) => response.data));
+  }
+
+  listCustomers(): Observable<CheckoutCustomer[]> {
+    return this.http
+      .get<{ data: CheckoutCustomer[] }>(`${this.apiUrl}/customers`)
       .pipe(map((response) => response.data));
   }
 
@@ -119,10 +141,15 @@ export class CheckoutService {
       .pipe(map((response) => response.data));
   }
 
-  createSale(items: CreateSaleItemPayload[]): Observable<Sale> {
+  createSale(items: CreateSaleItemPayload[], customerId?: string): Observable<Sale> {
     const sanitizedItems = items.map(({ productId, quantity }) => ({ productId, quantity }));
+    const trimmedCustomerId = customerId?.trim();
+    const payload = trimmedCustomerId
+      ? { items: sanitizedItems, customerId: trimmedCustomerId }
+      : { items: sanitizedItems };
+
     return this.http
-      .post<{ data: Sale }>(`${this.apiUrl}/sales`, { items: sanitizedItems })
+      .post<{ data: Sale }>(`${this.apiUrl}/sales`, payload)
       .pipe(map((response) => response.data));
   }
 
@@ -174,6 +201,15 @@ export class CheckoutService {
   payWithPix(saleId: string): Observable<PaymentResponse> {
     return this.http
       .post<{ data: PaymentResponse }>(`${this.apiUrl}/sales/${saleId}/payments/pix`, {})
+      .pipe(map((response) => response.data));
+  }
+
+  payWithCustomerCredit(saleId: string): Observable<CustomerCreditPaymentResult> {
+    return this.http
+      .post<{ data: CustomerCreditPaymentResult }>(
+        `${this.apiUrl}/sales/${encodeURIComponent(saleId)}/payments/credit`,
+        {},
+      )
       .pipe(map((response) => response.data));
   }
 }

@@ -119,7 +119,7 @@ Essas relações representam o núcleo do domínio sem definir banco, endpoints 
 
 **Regras relacionadas:** RN06, RN07
 
-### US05 — Pagar com crédito do cliente · `Must Have` · `M` · Status: `🟡 Ready`
+### US05 — Pagar com crédito do cliente · `Must Have` · `M` · Status: `🟢 Live`
 
 **Como** operador de caixa, **eu quero** usar o crédito de um cliente para pagar a venda **para que** o valor da compra seja descontado do saldo cadastrado.
 

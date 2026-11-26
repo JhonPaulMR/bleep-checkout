@@ -7,6 +7,7 @@ import { Test } from '@nestjs/testing';
 import * as argon2 from 'argon2';
 import request from 'supertest';
 import {
+  CreditType,
   PaymentMethod,
   PaymentStatus,
   Role,
@@ -29,6 +30,7 @@ describe('Pagamentos — /payments/config, /sales/:id/payments/card e /sales/:id
 
   const createdSaleIds: string[] = [];
   const createdProductIds: string[] = [];
+  const createdCustomerIds: string[] = [];
   const createdUserIds: string[] = [];
 
   const createCardPaymentMock =
@@ -84,12 +86,32 @@ describe('Pagamentos — /payments/config, /sales/:id/payments/card e /sales/:id
     return { user, email, password };
   }
 
-  async function createOpenSale(operatorToken: string, priceCents = 2590) {
+  async function createTestCustomer(balanceCents = 10000) {
+    const cpf = `${Date.now()}${Math.floor(Math.random() * 1000)}`.slice(-11);
+    const customer = await prisma.customer.create({
+      data: {
+        name: `Cliente Pagamento ${cpf}`,
+        cpf,
+        balanceCents,
+      },
+    });
+    createdCustomerIds.push(customer.id);
+    return customer;
+  }
+
+  async function createOpenSale(
+    operatorToken: string,
+    priceCents = 2590,
+    customerId?: string,
+  ) {
     const product = await createTestProduct(priceCents);
     const response = await request(app.getHttpServer())
       .post('/sales')
       .set('Authorization', `Bearer ${operatorToken}`)
-      .send({ items: [{ productId: product.id, quantity: 2 }] })
+      .send({
+        items: [{ productId: product.id, quantity: 2 }],
+        ...(customerId ? { customerId } : {}),
+      })
       .expect(201);
     const sale = response.body.data as {
       id: string;
@@ -130,6 +152,9 @@ describe('Pagamentos — /payments/config, /sales/:id/payments/card e /sales/:id
 
   afterEach(async () => {
     if (createdSaleIds.length > 0) {
+      await prisma.creditTransaction.deleteMany({
+        where: { saleId: { in: createdSaleIds } },
+      });
       await prisma.payment.deleteMany({
         where: { saleId: { in: createdSaleIds } },
       });
@@ -140,6 +165,15 @@ describe('Pagamentos — /payments/config, /sales/:id/payments/card e /sales/:id
         where: { id: { in: createdSaleIds } },
       });
       createdSaleIds.length = 0;
+    }
+    if (createdCustomerIds.length > 0) {
+      await prisma.creditTransaction.deleteMany({
+        where: { customerId: { in: createdCustomerIds } },
+      });
+      await prisma.customer.deleteMany({
+        where: { id: { in: createdCustomerIds } },
+      });
+      createdCustomerIds.length = 0;
     }
     if (createdProductIds.length > 0) {
       await prisma.product.deleteMany({
@@ -577,6 +611,191 @@ describe('Pagamentos — /payments/config, /sales/:id/payments/card e /sales/:id
         .post(`/sales/${sale.id}/payments/pix`)
         .set('Authorization', `Bearer ${operatorToken}`)
         .expect(422);
+    });
+  });
+
+  describe('POST /sales/:id/payments/credit', () => {
+    it('devolve 201 quando balanceCents >= totalCents, conclui venda (COMPLETED), grava Payment(CUSTOMER_CREDIT, APPROVED), CreditTransaction(SALE_DEBIT) e reduz Customer.balanceCents', async () => {
+      const operatorToken = await login(
+        process.env.SEED_OPERATOR_EMAIL!,
+        process.env.SEED_OPERATOR_PASSWORD!,
+      );
+      const customer = await createTestCustomer(10000);
+      const sale = await createOpenSale(operatorToken, 2590, customer.id);
+
+      const response = await request(app.getHttpServer())
+        .post(`/sales/${sale.id}/payments/credit`)
+        .set('Authorization', `Bearer ${operatorToken}`)
+        .expect(201);
+
+      expect(response.body.data.sale.status).toBe(SaleStatus.COMPLETED);
+      expect(response.body.data.sale.completedAt).toBeTruthy();
+      expect(response.body.data.payment.method).toBe(
+        PaymentMethod.CUSTOMER_CREDIT,
+      );
+      expect(response.body.data.payment.status).toBe(PaymentStatus.APPROVED);
+      expect(response.body.data.payment.amountCents).toBe(5180);
+      expect(response.body.data.customerBalanceCents).toBe(4820);
+
+      const customerInDb = await prisma.customer.findUniqueOrThrow({
+        where: { id: customer.id },
+      });
+      expect(customerInDb.balanceCents).toBe(4820);
+
+      const creditTx = await prisma.creditTransaction.findFirst({
+        where: { customerId: customer.id, saleId: sale.id },
+      });
+      expect(creditTx).toMatchObject({
+        customerId: customer.id,
+        saleId: sale.id,
+        type: CreditType.SALE_DEBIT,
+        amountCents: 5180,
+      });
+    });
+
+    it('permite pagamento quando balanceCents é exatamente igual a totalCents (saldo final 0)', async () => {
+      const operatorToken = await login(
+        process.env.SEED_OPERATOR_EMAIL!,
+        process.env.SEED_OPERATOR_PASSWORD!,
+      );
+      const customer = await createTestCustomer(3000);
+      const sale = await createOpenSale(operatorToken, 1500, customer.id);
+
+      const response = await request(app.getHttpServer())
+        .post(`/sales/${sale.id}/payments/credit`)
+        .set('Authorization', `Bearer ${operatorToken}`)
+        .expect(201);
+
+      expect(response.body.data.customerBalanceCents).toBe(0);
+      expect(response.body.data.sale.status).toBe(SaleStatus.COMPLETED);
+
+      const customerInDb = await prisma.customer.findUniqueOrThrow({
+        where: { id: customer.id },
+      });
+      expect(customerInDb.balanceCents).toBe(0);
+    });
+
+    it('devolve 422 ("Saldo insuficiente.") quando balanceCents < totalCents sem alterar saldo nem concluir venda', async () => {
+      const operatorToken = await login(
+        process.env.SEED_OPERATOR_EMAIL!,
+        process.env.SEED_OPERATOR_PASSWORD!,
+      );
+      const customer = await createTestCustomer(2000);
+      const sale = await createOpenSale(operatorToken, 1500, customer.id);
+
+      const response = await request(app.getHttpServer())
+        .post(`/sales/${sale.id}/payments/credit`)
+        .set('Authorization', `Bearer ${operatorToken}`)
+        .expect(422);
+
+      expect(response.body.message).toBe('Saldo insuficiente.');
+
+      const customerInDb = await prisma.customer.findUniqueOrThrow({
+        where: { id: customer.id },
+      });
+      expect(customerInDb.balanceCents).toBe(2000);
+
+      const saleInDb = await prisma.sale.findUniqueOrThrow({
+        where: { id: sale.id },
+        include: { payments: true },
+      });
+      expect(saleInDb.status).toBe(SaleStatus.OPEN);
+      expect(saleInDb.payments).toHaveLength(0);
+    });
+
+    it('devolve 422 ("Selecione um cliente para pagar com crédito.") quando a venda não tem customerId', async () => {
+      const operatorToken = await login(
+        process.env.SEED_OPERATOR_EMAIL!,
+        process.env.SEED_OPERATOR_PASSWORD!,
+      );
+      const sale = await createOpenSale(operatorToken, 1500);
+
+      const response = await request(app.getHttpServer())
+        .post(`/sales/${sale.id}/payments/credit`)
+        .set('Authorization', `Bearer ${operatorToken}`)
+        .expect(422);
+
+      expect(response.body.message).toBe(
+        'Selecione um cliente para pagar com crédito.',
+      );
+    });
+
+    it('devolve 422 quando a venda já está COMPLETED e não debita duas vezes', async () => {
+      const operatorToken = await login(
+        process.env.SEED_OPERATOR_EMAIL!,
+        process.env.SEED_OPERATOR_PASSWORD!,
+      );
+      const customer = await createTestCustomer(10000);
+      const sale = await createOpenSale(operatorToken, 1500, customer.id);
+
+      await request(app.getHttpServer())
+        .post(`/sales/${sale.id}/payments/credit`)
+        .set('Authorization', `Bearer ${operatorToken}`)
+        .expect(201);
+
+      await request(app.getHttpServer())
+        .post(`/sales/${sale.id}/payments/credit`)
+        .set('Authorization', `Bearer ${operatorToken}`)
+        .expect(422);
+
+      const customerInDb = await prisma.customer.findUniqueOrThrow({
+        where: { id: customer.id },
+      });
+      expect(customerInDb.balanceCents).toBe(7000);
+    });
+
+    it('devolve 401 sem token JWT', async () => {
+      await request(app.getHttpServer())
+        .post(`/sales/${randomUUID()}/payments/credit`)
+        .expect(401);
+    });
+
+    it('devolve 403 para MANAGER', async () => {
+      const managerToken = await login(
+        process.env.SEED_MANAGER_EMAIL!,
+        process.env.SEED_MANAGER_PASSWORD!,
+      );
+
+      await request(app.getHttpServer())
+        .post(`/sales/${randomUUID()}/payments/credit`)
+        .set('Authorization', `Bearer ${managerToken}`)
+        .expect(403);
+    });
+
+    it('devolve 403 quando outro OPERATOR tenta pagar a venda', async () => {
+      const operatorToken = await login(
+        process.env.SEED_OPERATOR_EMAIL!,
+        process.env.SEED_OPERATOR_PASSWORD!,
+      );
+      const customer = await createTestCustomer(10000);
+      const sale = await createOpenSale(operatorToken, 1500, customer.id);
+
+      const otherOp = await createTestOperator();
+      const otherToken = await login(otherOp.email, otherOp.password);
+
+      await request(app.getHttpServer())
+        .post(`/sales/${sale.id}/payments/credit`)
+        .set('Authorization', `Bearer ${otherToken}`)
+        .expect(403);
+
+      const customerInDb = await prisma.customer.findUniqueOrThrow({
+        where: { id: customer.id },
+      });
+      expect(customerInDb.balanceCents).toBe(10000);
+    });
+
+    it('devolve 404 para venda inexistente', async () => {
+      const operatorToken = await login(
+        process.env.SEED_OPERATOR_EMAIL!,
+        process.env.SEED_OPERATOR_PASSWORD!,
+      );
+
+      const response = await request(app.getHttpServer())
+        .post(`/sales/${randomUUID()}/payments/credit`)
+        .set('Authorization', `Bearer ${operatorToken}`)
+        .expect(404);
+
+      expect(response.body.message).toBe('Venda não encontrada.');
     });
   });
 });

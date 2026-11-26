@@ -14,6 +14,7 @@ import { FormsModule } from '@angular/forms';
 import { firstValueFrom, Subscription } from 'rxjs';
 import { AuthService } from '../../../core/auth/auth.service';
 import {
+  CheckoutCustomer,
   CheckoutService,
   Payment,
   PayWithCardPayload,
@@ -28,7 +29,7 @@ const CARD_DECLINED_MESSAGE =
 const DEFAULT_PAYER_EMAIL = 'operador@bleep.local';
 const CARD_BRICK_CONTAINER_ID = 'card-payment-brick-container';
 
-type CheckoutPaymentMethod = 'CARD' | 'PIX';
+type CheckoutPaymentMethod = 'CARD' | 'PIX' | 'CUSTOMER_CREDIT';
 
 interface CartItem {
   product: Product;
@@ -128,6 +129,27 @@ export class CheckoutPage {
   protected readonly searchError = signal<string | null>(null);
   protected readonly hasSearched = signal(false);
 
+  protected readonly selectedCustomer = signal<CheckoutCustomer | null>(null);
+  protected readonly customerModalOpen = signal(false);
+  protected readonly customers = signal<CheckoutCustomer[]>([]);
+  protected readonly customerSearchTerm = signal('');
+  protected readonly loadingCustomers = signal(false);
+  protected readonly customerError = signal<string | null>(null);
+  protected readonly filteredCustomers = computed(() => {
+    const term = this.customerSearchTerm().trim();
+    if (!term) return this.customers();
+
+    const nameQuery = term.toLowerCase();
+    const digitsQuery = term.replace(/\D/g, '');
+
+    return this.customers().filter((customer) => {
+      const matchesName = customer.name.toLowerCase().includes(nameQuery);
+      const matchesCpf =
+        digitsQuery !== '' && customer.cpf.replace(/\D/g, '').includes(digitsQuery);
+      return matchesName || matchesCpf;
+    });
+  });
+
   protected readonly cart = signal<CartItem[]>([]);
   protected readonly cartTotalCents = computed(() =>
     this.cart().reduce((sum, item) => sum + item.product.priceCents * item.quantity, 0),
@@ -142,6 +164,10 @@ export class CheckoutPage {
   protected readonly sale = signal<Sale | null>(null);
   protected readonly lastPayment = signal<Payment | null>(null);
   protected readonly selectedMethod = signal<CheckoutPaymentMethod>('CARD');
+  protected readonly completedCustomerBalanceCents = signal<number | null>(null);
+  protected readonly activeSaleCustomer = computed(
+    () => this.sale()?.customer ?? this.selectedCustomer(),
+  );
 
   protected readonly brickLoading = signal(false);
   protected readonly submittingPayment = signal(false);
@@ -170,19 +196,34 @@ export class CheckoutPage {
   }
 
   protected onWindowKeydown(event: KeyboardEvent): void {
-    if (event.key === 'Escape' && this.searchModalOpen()) {
-      event.preventDefault();
-      this.closeSearchModal();
-      return;
+    if (event.key === 'Escape') {
+      if (this.searchModalOpen()) {
+        event.preventDefault();
+        this.closeSearchModal();
+        return;
+      }
+      if (this.customerModalOpen()) {
+        event.preventDefault();
+        this.closeCustomerModal();
+        return;
+      }
     }
 
-    if (event.key === 'F2' && !this.sale() && !this.searchModalOpen()) {
+    const anyModalOpen = this.searchModalOpen() || this.customerModalOpen();
+
+    if (event.key === 'F2' && !this.sale() && !anyModalOpen) {
       event.preventDefault();
       this.quantityInputEl()?.nativeElement.focus();
       return;
     }
 
-    if (event.key === 'F4' && !this.sale() && !this.searchModalOpen()) {
+    if (event.key === 'F3' && !this.sale() && !anyModalOpen) {
+      event.preventDefault();
+      this.openCustomerModal();
+      return;
+    }
+
+    if (event.key === 'F4' && !this.sale() && !anyModalOpen) {
       event.preventDefault();
       this.focusBarcodeInput();
     }
@@ -193,6 +234,12 @@ export class CheckoutPage {
       style: 'currency',
       currency: 'BRL',
     }).format(cents / 100);
+  }
+
+  protected formatCpf(cpf: string): string {
+    const digits = cpf.replace(/\D/g, '');
+    if (digits.length !== 11) return cpf;
+    return digits.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
   }
 
   protected formatRowIndex(index: number): string {
@@ -263,6 +310,53 @@ export class CheckoutPage {
   protected closeSearchModal(): void {
     this.searchModalOpen.set(false);
     this.focusBarcodeInput();
+  }
+
+  protected openCustomerModal(): void {
+    if (this.creatingSale() || this.sale()) return;
+    this.customerSearchTerm.set('');
+    this.customerError.set(null);
+    this.customerModalOpen.set(true);
+    this.loadCustomers();
+  }
+
+  protected closeCustomerModal(): void {
+    this.customerModalOpen.set(false);
+    this.focusBarcodeInput();
+  }
+
+  protected onCustomerModalBackdropClick(event: MouseEvent): void {
+    if (event.target === event.currentTarget) {
+      this.closeCustomerModal();
+    }
+  }
+
+  protected loadCustomers(): void {
+    if (this.loadingCustomers()) return;
+
+    this.customerError.set(null);
+    this.loadingCustomers.set(true);
+
+    this.checkoutService.listCustomers().subscribe({
+      next: (customers) => {
+        this.loadingCustomers.set(false);
+        this.customers.set(customers);
+      },
+      error: (err: unknown) => {
+        this.loadingCustomers.set(false);
+        if (err instanceof HttpErrorResponse && err.status === 401) return;
+        this.customerError.set(NETWORK_ERROR_MESSAGE);
+      },
+    });
+  }
+
+  protected selectCustomer(customer: CheckoutCustomer): void {
+    this.selectedCustomer.set(customer);
+    this.closeCustomerModal();
+  }
+
+  protected removeSelectedCustomer(): void {
+    this.selectedCustomer.set(null);
   }
 
   protected runProductSearch(): void {
@@ -348,11 +442,17 @@ export class CheckoutPage {
       quantity: item.quantity,
     }));
 
-    this.checkoutService.createSale(itemsPayload).subscribe({
+    const customerId = this.selectedCustomer()?.id;
+    const createSale$ = customerId
+      ? this.checkoutService.createSale(itemsPayload, customerId)
+      : this.checkoutService.createSale(itemsPayload);
+
+    createSale$.subscribe({
       next: (createdSale) => {
         this.creatingSale.set(false);
         this.sale.set(createdSale);
         this.lastPayment.set(null);
+        this.completedCustomerBalanceCents.set(null);
         this.paymentError.set(null);
         this.declinedMessage.set(null);
         this.selectedMethod.set('CARD');
@@ -416,6 +516,51 @@ export class CheckoutPage {
     });
   }
 
+  protected submitCustomerCreditPayment(): void {
+    const currentSale = this.sale();
+    const customer = this.activeSaleCustomer();
+    if (
+      !currentSale ||
+      currentSale.status !== 'OPEN' ||
+      !customer ||
+      customer.balanceCents < currentSale.totalCents ||
+      this.submittingPayment()
+    ) {
+      return;
+    }
+
+    this.paymentError.set(null);
+    this.declinedMessage.set(null);
+    this.submittingPayment.set(true);
+
+    this.checkoutService.payWithCustomerCredit(currentSale.id).subscribe({
+      next: (result) => {
+        this.submittingPayment.set(false);
+        this.sale.set(result.sale);
+        this.lastPayment.set(result.payment);
+        this.completedCustomerBalanceCents.set(result.customerBalanceCents);
+
+        const currentCustomer = this.selectedCustomer();
+        if (currentCustomer) {
+          this.selectedCustomer.set({
+            ...currentCustomer,
+            balanceCents: result.customerBalanceCents,
+          });
+        } else if (result.sale.customer) {
+          this.selectedCustomer.set({
+            ...result.sale.customer,
+            balanceCents: result.customerBalanceCents,
+          });
+        }
+      },
+      error: (err: unknown) => {
+        this.submittingPayment.set(false);
+        if (err instanceof HttpErrorResponse && err.status === 401) return;
+        this.paymentError.set(this.extractErrorMessage(err));
+      },
+    });
+  }
+
   protected copyPixCode(code: string): void {
     if (typeof navigator !== 'undefined' && navigator.clipboard) {
       void navigator.clipboard
@@ -445,6 +590,11 @@ export class CheckoutPage {
     this.declinedMessage.set(null);
     this.copiedPixCode.set(false);
     this.selectedMethod.set('CARD');
+    this.completedCustomerBalanceCents.set(null);
+    this.selectedCustomer.set(null);
+    this.customerModalOpen.set(false);
+    this.customerSearchTerm.set('');
+    this.customerError.set(null);
   }
 
   private initializeCardBrick(currentSale: Sale): void {
