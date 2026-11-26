@@ -101,6 +101,24 @@ export class CheckoutService {
       .pipe(map((response) => response.data));
   }
 
+  findProductByBarcode(barcode: string): Observable<Product> {
+    const encoded = encodeURIComponent(barcode.trim());
+    return this.http
+      .get<{ data: Product }>(`${this.apiUrl}/products/barcode/${encoded}`)
+      .pipe(map((response) => response.data));
+  }
+
+  searchProducts(term: string): Observable<Product[]> {
+    const trimmed = term.trim();
+    const url = trimmed
+      ? `${this.apiUrl}/products?search=${encodeURIComponent(trimmed)}`
+      : `${this.apiUrl}/products`;
+
+    return this.http
+      .get<{ data: Product[] }>(url)
+      .pipe(map((response) => response.data));
+  }
+
   createSale(items: CreateSaleItemPayload[]): Observable<Sale> {
     const sanitizedItems = items.map(({ productId, quantity }) => ({ productId, quantity }));
     return this.http

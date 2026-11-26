@@ -73,6 +73,48 @@ describe('CheckoutService', () => {
     expect(result).toEqual([sampleProduct]);
   });
 
+  it('findProductByBarcode() faz GET /products/barcode/:barcode codificado e com trim, desembrulhando { data }', () => {
+    let result: Product | undefined;
+
+    service.findProductByBarcode(' 7891000120140 ').subscribe((product) => {
+      result = product;
+    });
+
+    const req = controller.expectOne(`${apiUrl}/products/barcode/7891000120140`);
+    expect(req.request.method).toBe('GET');
+    req.flush({ data: sampleProduct });
+
+    expect(result).toEqual(sampleProduct);
+  });
+
+  it('searchProducts() com termo preenchido faz GET /products?search=:term codificado e com trim, desembrulhando { data }', () => {
+    let result: Product[] | undefined;
+
+    service.searchProducts(' café ').subscribe((products) => {
+      result = products;
+    });
+
+    const req = controller.expectOne(`${apiUrl}/products?search=caf%C3%A9`);
+    expect(req.request.method).toBe('GET');
+    req.flush({ data: [sampleProduct] });
+
+    expect(result).toEqual([sampleProduct]);
+  });
+
+  it('searchProducts() com termo vazio ou só espaços faz GET /products sem query param, desembrulhando { data }', () => {
+    let result: Product[] | undefined;
+
+    service.searchProducts('   ').subscribe((products) => {
+      result = products;
+    });
+
+    const req = controller.expectOne(`${apiUrl}/products`);
+    expect(req.request.method).toBe('GET');
+    req.flush({ data: [sampleProduct] });
+
+    expect(result).toEqual([sampleProduct]);
+  });
+
   it('createSale() faz POST /sales enviando apenas productId e quantity e desembrulha { data }', () => {
     let result: Sale | undefined;
 

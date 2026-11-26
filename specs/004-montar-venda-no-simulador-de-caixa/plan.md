@@ -23,7 +23,7 @@
   - Teste primeiro: testes unitários em `products.service.spec.ts` (`findActiveByBarcode` retorna produto ativo e lança `NotFoundException('Produto não localizado.')` se ausente/inativo; `listForRole` aplica filtro `contains` case-insensitive quando `search` é informado) e testes e2e em `apps/api/test/products.e2e-spec.ts` (`GET /products/barcode/:barcode` `200` para produto ativo, `404` para inexistente e desativado, `403` para `MANAGER`, `401` sem token; `GET /products?search=` filtra case-insensitive apenas ativos para `OPERATOR` e retorna lista vazia quando não encontra); falham porque o endpoint e o filtro ainda não existem
   - Arquivos previstos: `apps/api/src/modules/products/products.service.ts`, `apps/api/src/modules/products/products.service.spec.ts`, `apps/api/src/modules/products/products.controller.ts`, `apps/api/test/products.e2e-spec.ts`
 
-- [ ] **Tarefa 2 — Adicionar `findProductByBarcode()` e `searchProducts()` em `CheckoutService` no frontend**
+- [x] **Tarefa 2 — Adicionar `findProductByBarcode()` e `searchProducts()` em `CheckoutService` no frontend**
   - Cobre: CA1 (serviço de busca por código), CA3 (serviço de busca por nome)
   - Teste primeiro: testes unitários em `checkout.service.spec.ts` verificando `findProductByBarcode('7891000120140')` fazendo `GET /products/barcode/7891000120140` e `searchProducts('café')` fazendo `GET /products?search=caf%C3%A9`, ambos desembrulhando `{ data }`; falham porque os métodos ainda não existem
   - Arquivos previstos: `apps/web/src/app/features/checkout/data/checkout.service.ts`, `apps/web/src/app/features/checkout/data/checkout.service.spec.ts`
