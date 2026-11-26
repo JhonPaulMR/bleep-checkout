@@ -3,7 +3,9 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { TestBed } from '@angular/core/testing';
 import { API_URL } from '../../../core/config/api-url';
 import {
+  CheckoutCustomer,
   CheckoutService,
+  CustomerCreditPaymentResult,
   PaymentConfig,
   PaymentResponse,
   Product,
@@ -14,6 +16,14 @@ describe('CheckoutService', () => {
   let service: CheckoutService;
   let controller: HttpTestingController;
   let apiUrl: string;
+
+  const sampleCustomer: CheckoutCustomer = {
+    id: 'cust-1',
+    name: 'Maria Oliveira',
+    cpf: '12345678901',
+    balanceCents: 5000,
+    createdAt: '2026-11-24T10:00:00.000Z',
+  };
 
   const sampleProduct: Product = {
     id: 'prod-1',
@@ -71,6 +81,20 @@ describe('CheckoutService', () => {
     req.flush({ data: [sampleProduct] });
 
     expect(result).toEqual([sampleProduct]);
+  });
+
+  it('listCustomers() faz GET /customers e desembrulha { data }', () => {
+    let result: CheckoutCustomer[] | undefined;
+
+    service.listCustomers().subscribe((customers) => {
+      result = customers;
+    });
+
+    const req = controller.expectOne(`${apiUrl}/customers`);
+    expect(req.request.method).toBe('GET');
+    req.flush({ data: [sampleCustomer] });
+
+    expect(result).toEqual([sampleCustomer]);
   });
 
   it('findProductByBarcode() faz GET /products/barcode/:barcode codificado e com trim, desembrulhando { data }', () => {
@@ -136,6 +160,46 @@ describe('CheckoutService', () => {
     });
     expect(req.request.body).not.toHaveProperty('totalCents');
     expect(req.request.body.items[0]).not.toHaveProperty('priceCents');
+    req.flush({ data: sampleSale });
+
+    expect(result).toEqual(sampleSale);
+  });
+
+  it('createSale() envia customerId quando informado e desembrulha { data }', () => {
+    let result: Sale | undefined;
+
+    const payload = [{ productId: 'prod-1', quantity: 2 }];
+
+    service.createSale(payload, 'cust-1').subscribe((sale) => {
+      result = sale;
+    });
+
+    const req = controller.expectOne(`${apiUrl}/sales`);
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body).toEqual({
+      items: [{ productId: 'prod-1', quantity: 2 }],
+      customerId: 'cust-1',
+    });
+    req.flush({ data: { ...sampleSale, customerId: 'cust-1' } });
+
+    expect(result).toEqual({ ...sampleSale, customerId: 'cust-1' });
+  });
+
+  it('createSale() omite customerId quando vazio ou espaços', () => {
+    let result: Sale | undefined;
+
+    const payload = [{ productId: 'prod-1', quantity: 2 }];
+
+    service.createSale(payload, '   ').subscribe((sale) => {
+      result = sale;
+    });
+
+    const req = controller.expectOne(`${apiUrl}/sales`);
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body).toEqual({
+      items: [{ productId: 'prod-1', quantity: 2 }],
+    });
+    expect(req.request.body).not.toHaveProperty('customerId');
     req.flush({ data: sampleSale });
 
     expect(result).toEqual(sampleSale);
@@ -231,6 +295,42 @@ describe('CheckoutService', () => {
     });
 
     const req = controller.expectOne(`${apiUrl}/sales/sale-1/payments/pix`);
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body).toEqual({});
+    req.flush({ data: response });
+
+    expect(result).toEqual(response);
+  });
+
+  it('payWithCustomerCredit() faz POST /sales/:id/payments/credit com corpo vazio e desembrulha { data }', () => {
+    let result: CustomerCreditPaymentResult | undefined;
+    const response: CustomerCreditPaymentResult = {
+      payment: {
+        id: 'pay-credit-1',
+        saleId: 'sale-1',
+        method: 'CUSTOMER_CREDIT',
+        status: 'APPROVED',
+        amountCents: 2500,
+        gatewayPaymentId: null,
+        qrCode: null,
+        qrCodeBase64: null,
+        createdAt: '2026-11-24T10:06:00.000Z',
+      },
+      sale: {
+        ...sampleSale,
+        status: 'COMPLETED',
+        customerId: 'cust-1',
+        customer: sampleCustomer,
+        completedAt: '2026-11-24T10:06:01.000Z',
+      },
+      customerBalanceCents: 2500,
+    };
+
+    service.payWithCustomerCredit('sale-1').subscribe((res) => {
+      result = res;
+    });
+
+    const req = controller.expectOne(`${apiUrl}/sales/sale-1/payments/credit`);
     expect(req.request.method).toBe('POST');
     expect(req.request.body).toEqual({});
     req.flush({ data: response });
