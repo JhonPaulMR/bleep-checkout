@@ -840,4 +840,194 @@ describe('CheckoutPage', () => {
     controller.verify();
     sessionStorage.clear();
   });
+
+  function setQuantityInput(el: HTMLElement, value: string): HTMLInputElement {
+    const input = el.querySelector<HTMLInputElement>('[data-testid="quantity-input"]')!;
+    input.value = value;
+    input.dispatchEvent(new Event('input'));
+    return input;
+  }
+
+  it('US04 CA1: inclui 4 unidades por código de barras (botão Adicionar), recalcula total e reseta quantidade para 1', async () => {
+    const fixture = setup();
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+
+    const qtyInput = setQuantityInput(el, '4');
+    fixture.detectChanges();
+
+    addByBarcodeClick(fixture, '7890000000001');
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(findProductByBarcodeSpy).toHaveBeenCalledWith('7890000000001');
+    expect(el.textContent).toContain('Café Espresso');
+    expect(el.textContent).toContain('4 un');
+    expect(el.textContent).toContain('50,00');
+    expect(qtyInput.value).toBe('1');
+  });
+
+  it('US04 CA1: inclui 4 unidades via leitor USB (Enter) usando botões +/- e reseta quantidade para 1', async () => {
+    const fixture = setup();
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+
+    const incBtn = el.querySelector<HTMLButtonElement>('[data-testid="qty-increase"]')!;
+    incBtn.click();
+    incBtn.click();
+    incBtn.click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    const qtyInput = el.querySelector<HTMLInputElement>('[data-testid="quantity-input"]')!;
+    expect(qtyInput.value).toBe('4');
+
+    const barcodeInput = setBarcodeInput(el, '7890000000002');
+    fixture.detectChanges();
+    barcodeInput.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(el.textContent).toContain('Pão de Queijo');
+    expect(el.textContent).toContain('4 un');
+    expect(el.textContent).toContain('32,00');
+    expect(qtyInput.value).toBe('1');
+  });
+
+  it('US04 CA2: inclusão repetida de 4 + 4 do mesmo produto soma para 8 unidades na mesma linha sem duplicar', async () => {
+    const fixture = setup();
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+
+    setQuantityInput(el, '4');
+    fixture.detectChanges();
+    addByBarcodeClick(fixture, '7890000000001');
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    setQuantityInput(el, '4');
+    fixture.detectChanges();
+    addByBarcodeClick(fixture, '7890000000001');
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const rows = el.querySelectorAll('tbody tr');
+    expect(rows.length).toBe(1);
+    expect(el.textContent).toContain('8 un');
+    expect(el.textContent).toContain('100,00');
+  });
+
+  it('US04 CA3: bloqueia 0, -2, 1.5 e vazio no código de barras sem chamar API nem alterar carrinho', () => {
+    const fixture = setup();
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+
+    for (const invalidValue of ['0', '-2', '1.5', '']) {
+      setQuantityInput(el, invalidValue);
+      fixture.detectChanges();
+
+      addByBarcodeClick(fixture, '7890000000001');
+
+      expect(findProductByBarcodeSpy).not.toHaveBeenCalled();
+      const errorEl = el.querySelector('[data-testid="quantity-error"]');
+      expect(errorEl).not.toBeNull();
+      expect(errorEl?.getAttribute('role')).toBe('alert');
+      expect(errorEl?.textContent).toContain('Informe uma quantidade inteira positiva.');
+      expect(el.querySelectorAll('tbody tr').length).toBe(0);
+    }
+  });
+
+  it('US04 CA3 e CA4: modal de busca sincroniza unidades, exibe prévia Total N un. / Adicionar N un., bloqueia inválidos e adiciona 4 unidades', async () => {
+    const fixture = setup();
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+
+    el.querySelector<HTMLButtonElement>('[data-testid="open-search-modal"]')!.click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const modal = el.querySelector('[data-testid="search-product-modal"]')!;
+    const modalIncBtn = modal.querySelector<HTMLButtonElement>('[data-testid="modal-qty-increase"]')!;
+    modalIncBtn.click();
+    modalIncBtn.click();
+    modalIncBtn.click();
+    fixture.detectChanges();
+
+    expect(modal.textContent).toContain('Total 4 un:');
+    expect(modal.textContent).toContain('50,00');
+    expect(modal.textContent).toContain('Adicionar 4 un.');
+
+    // Testa bloqueio de quantidade inválida no modal
+    setQuantityInput(el, '0');
+    fixture.detectChanges();
+    modal
+      .querySelector<HTMLButtonElement>('[data-testid="select-search-product-prod-1"]')!
+      .click();
+    fixture.detectChanges();
+
+    const modalAlert = modal.querySelector('[role="alert"]');
+    expect(modalAlert?.textContent).toContain('Informe uma quantidade inteira positiva.');
+    expect(el.querySelector('[data-testid="search-product-modal"]')).not.toBeNull();
+    expect(el.querySelectorAll('tbody tr').length).toBe(0);
+
+    // Ajusta de volta para 4 e adiciona
+    setQuantityInput(el, '4');
+    fixture.detectChanges();
+    modal
+      .querySelector<HTMLButtonElement>('[data-testid="select-search-product-prod-1"]')!
+      .click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    expect(el.querySelector('[data-testid="search-product-modal"]')).toBeNull();
+    expect(el.textContent).toContain('Café Espresso');
+    expect(el.textContent).toContain('4 un');
+    expect(el.textContent).toContain('50,00');
+    expect(el.querySelector<HTMLInputElement>('[data-testid="quantity-input"]')!.value).toBe('1');
+  });
+
+  it('US04 CA5: atalho F2 foca o campo Nº de unidades durante a montagem da venda', () => {
+    const fixture = setup();
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+
+    const qtyInput = el.querySelector<HTMLInputElement>('[data-testid="quantity-input"]')!;
+    const focusSpy = vi.spyOn(qtyInput, 'focus');
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'F2' }));
+    fixture.detectChanges();
+
+    expect(focusSpy).toHaveBeenCalled();
+  });
+
+  it('US04 CA7: abandono com quantidade 4 (Esc no modal ou 404 no código de barras) mantém carrinho inalterado', async () => {
+    const fixture = setup();
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+
+    setQuantityInput(el, '4');
+    fixture.detectChanges();
+
+    // Esc no modal
+    el.querySelector<HTMLButtonElement>('[data-testid="open-search-modal"]')!.click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    fixture.detectChanges();
+
+    expect(el.querySelector('[data-testid="search-product-modal"]')).toBeNull();
+    expect(el.querySelectorAll('tbody tr').length).toBe(0);
+
+    // 404 no código de barras
+    addByBarcodeClick(fixture, '0000000000000');
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(el.querySelector('[data-testid="barcode-error"]')?.textContent).toContain(
+      'Produto não localizado.',
+    );
+    expect(el.querySelectorAll('tbody tr').length).toBe(0);
+  });
 });
