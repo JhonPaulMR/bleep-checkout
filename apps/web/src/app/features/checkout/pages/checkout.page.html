@@ -31,6 +31,65 @@
       <div class="grid grid-cols-1 items-start gap-lg lg:grid-cols-12">
         <div class="flex flex-col gap-lg lg:col-span-8">
           <section class="flex flex-col gap-md rounded-lg bg-superficie p-lg shadow">
+            <div class="flex flex-col gap-xs">
+              <div class="flex items-center justify-between gap-sm">
+                <label for="quantityInput" class="text-corpo-destaque text-texto">
+                  Nº de unidades
+                </label>
+                <kbd
+                  class="rounded border border-desabilitado bg-fundo px-sm py-xs text-legenda text-texto-suave"
+                >
+                  [F2]
+                </kbd>
+              </div>
+
+              <div
+                class="inline-flex w-fit items-center rounded-md bg-superficie"
+                [class.border-2]="!!quantityError()"
+                [class.border-perigo]="!!quantityError()"
+                [class.border]="!quantityError()"
+                [class.border-desabilitado]="!quantityError()"
+              >
+                <button
+                  type="button"
+                  data-testid="qty-decrease"
+                  aria-label="Diminuir unidades"
+                  class="px-md py-sm text-corpo-destaque text-texto hover:bg-fundo focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primaria disabled:text-desabilitado"
+                  [disabled]="creatingSale()"
+                  (click)="decreaseInputQuantity()"
+                >
+                  -
+                </button>
+                <input
+                  #quantityInputEl
+                  id="quantityInput"
+                  name="quantityInput"
+                  data-testid="quantity-input"
+                  type="text"
+                  inputmode="numeric"
+                  class="w-16 border-x border-desabilitado bg-superficie px-sm py-sm text-center text-corpo-destaque text-texto focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primaria"
+                  [ngModel]="quantityInput()"
+                  (ngModelChange)="onQuantityChange($event)"
+                />
+                <button
+                  type="button"
+                  data-testid="qty-increase"
+                  aria-label="Aumentar unidades"
+                  class="px-md py-sm text-corpo-destaque text-texto hover:bg-fundo focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primaria disabled:text-desabilitado"
+                  [disabled]="creatingSale()"
+                  (click)="increaseInputQuantity()"
+                >
+                  +
+                </button>
+              </div>
+
+              @if (quantityError(); as message) {
+                <p role="alert" data-testid="quantity-error" class="text-legenda text-perigo">
+                  {{ message }}
+                </p>
+              }
+            </div>
+
             <div class="flex items-center justify-between gap-sm">
               <label for="barcodeInput" class="text-corpo-destaque text-texto">
                 Código de barras (EAN-13)
@@ -583,6 +642,45 @@
             (ngModelChange)="searchTerm.set($event)"
             (keydown.enter)="runProductSearch()"
           />
+          <div class="flex items-center gap-xs">
+            <span class="text-legenda text-texto-suave">Unidades</span>
+            <div
+              class="inline-flex w-fit items-center rounded-md bg-superficie"
+              [class.border-2]="!!quantityError()"
+              [class.border-perigo]="!!quantityError()"
+              [class.border]="!quantityError()"
+              [class.border-desabilitado]="!quantityError()"
+            >
+              <button
+                type="button"
+                data-testid="modal-qty-decrease"
+                aria-label="Diminuir unidades no modal"
+                class="px-sm py-sm text-corpo-destaque text-texto hover:bg-fundo focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primaria"
+                (click)="decreaseInputQuantity()"
+              >
+                -
+              </button>
+              <input
+                type="text"
+                inputmode="numeric"
+                name="modalQuantityInput"
+                data-testid="modal-quantity-input"
+                aria-label="Unidades"
+                class="w-14 border-x border-desabilitado bg-superficie px-xs py-sm text-center text-corpo-destaque text-texto focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primaria"
+                [ngModel]="quantityInput()"
+                (ngModelChange)="onQuantityChange($event)"
+              />
+              <button
+                type="button"
+                data-testid="modal-qty-increase"
+                aria-label="Aumentar unidades no modal"
+                class="px-sm py-sm text-corpo-destaque text-texto hover:bg-fundo focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primaria"
+                (click)="increaseInputQuantity()"
+              >
+                +
+              </button>
+            </div>
+          </div>
           <button
             type="button"
             data-testid="run-product-search"
@@ -600,6 +698,12 @@
             </span>
           }
         </div>
+
+        @if (quantityError(); as message) {
+          <p role="alert" data-testid="modal-quantity-error" class="text-legenda text-perigo">
+            {{ message }}
+          </p>
+        }
 
         <div class="flex-1 overflow-y-auto">
           @if (searchingProducts()) {
@@ -629,16 +733,22 @@
                   </div>
 
                   <div class="flex items-center gap-md">
-                    <span class="text-corpo-destaque text-texto">
-                      {{ formatCents(product.priceCents) }}
-                    </span>
+                    <div class="flex flex-col items-end">
+                      <span class="text-corpo-destaque text-texto">
+                        {{ formatCents(product.priceCents) }}
+                      </span>
+                      <span class="text-legenda text-texto-suave">
+                        Total {{ effectivePreviewQuantity() }} un:
+                        {{ formatCents(product.priceCents * effectivePreviewQuantity()) }}
+                      </span>
+                    </div>
                     <button
                       type="button"
                       [attr.data-testid]="'select-search-product-' + product.id"
                       class="rounded-md bg-primaria px-md py-sm text-corpo-destaque text-superficie hover:brightness-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primaria"
                       (click)="selectSearchedProduct(product)"
                     >
-                      Adicionar
+                      Adicionar {{ effectivePreviewQuantity() }} un.
                     </button>
                   </div>
                 </li>

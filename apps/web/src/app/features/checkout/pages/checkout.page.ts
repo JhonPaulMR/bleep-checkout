@@ -22,6 +22,7 @@ import {
 } from '../data/checkout.service';
 
 const NETWORK_ERROR_MESSAGE = 'Não foi possível conectar. Tente novamente.';
+const INVALID_QUANTITY_MESSAGE = 'Informe uma quantidade inteira positiva.';
 const CARD_DECLINED_MESSAGE =
   'Pagamento recusado. Tente outro cartão ou escolha outra forma de pagamento.';
 const DEFAULT_PAYER_EMAIL = 'operador@bleep.local';
@@ -96,6 +97,7 @@ export class CheckoutPage {
   private readonly destroyRef = inject(DestroyRef);
   private readonly injector = inject(Injector);
   private readonly barcodeInputEl = viewChild<ElementRef<HTMLInputElement>>('barcodeInput');
+  private readonly quantityInputEl = viewChild<ElementRef<HTMLInputElement>>('quantityInputEl');
 
   private pollingSubscription: Subscription | null = null;
   private cardBrickController: CardBrickController | null = null;
@@ -108,6 +110,16 @@ export class CheckoutPage {
   protected readonly barcodeTerm = signal('');
   protected readonly lookingUpBarcode = signal(false);
   protected readonly barcodeError = signal<string | null>(null);
+
+  protected readonly quantityInput = signal('1');
+  protected readonly quantityError = signal<string | null>(null);
+  protected readonly parsedQuantity = computed<number | null>(() => {
+    const raw = this.quantityInput().trim();
+    if (!/^\d+$/.test(raw)) return null;
+    const value = Number.parseInt(raw, 10);
+    return Number.isSafeInteger(value) && value >= 1 ? value : null;
+  });
+  protected readonly effectivePreviewQuantity = computed(() => this.parsedQuantity() ?? 1);
 
   protected readonly searchModalOpen = signal(false);
   protected readonly searchTerm = signal('');
@@ -164,6 +176,12 @@ export class CheckoutPage {
       return;
     }
 
+    if (event.key === 'F2' && !this.sale() && !this.searchModalOpen()) {
+      event.preventDefault();
+      this.quantityInputEl()?.nativeElement.focus();
+      return;
+    }
+
     if (event.key === 'F4' && !this.sale() && !this.searchModalOpen()) {
       event.preventDefault();
       this.focusBarcodeInput();
@@ -181,9 +199,32 @@ export class CheckoutPage {
     return String(index + 1).padStart(2, '0');
   }
 
+  protected onQuantityChange(value: string): void {
+    this.quantityInput.set(value);
+    this.quantityError.set(null);
+  }
+
+  protected decreaseInputQuantity(): void {
+    const current = this.parsedQuantity() ?? 1;
+    this.quantityInput.set(String(Math.max(1, current - 1)));
+    this.quantityError.set(null);
+  }
+
+  protected increaseInputQuantity(): void {
+    const current = this.parsedQuantity() ?? 0;
+    this.quantityInput.set(String(current + 1));
+    this.quantityError.set(null);
+  }
+
   protected addByBarcode(): void {
     const code = this.barcodeTerm().trim();
     if (!code || this.lookingUpBarcode() || this.creatingSale()) return;
+
+    const qty = this.parsedQuantity();
+    if (qty === null) {
+      this.quantityError.set(INVALID_QUANTITY_MESSAGE);
+      return;
+    }
 
     this.barcodeError.set(null);
     this.lookingUpBarcode.set(true);
@@ -191,8 +232,9 @@ export class CheckoutPage {
     this.checkoutService.findProductByBarcode(code).subscribe({
       next: (product) => {
         this.lookingUpBarcode.set(false);
-        // TODO #5: quantidade prévia configurável entra na US04
-        this.addProduct(product);
+        this.addProduct(product, qty);
+        this.quantityInput.set('1');
+        this.quantityError.set(null);
         this.barcodeTerm.set('');
         this.barcodeError.set(null);
         this.focusBarcodeInput();
@@ -244,21 +286,28 @@ export class CheckoutPage {
   }
 
   protected selectSearchedProduct(product: Product): void {
-    // TODO #5: quantidade prévia configurável entra na US04
-    this.addProduct(product);
+    const qty = this.parsedQuantity();
+    if (qty === null) {
+      this.quantityError.set(INVALID_QUANTITY_MESSAGE);
+      return;
+    }
+
+    this.addProduct(product, qty);
+    this.quantityInput.set('1');
+    this.quantityError.set(null);
     this.closeSearchModal();
   }
 
-  protected addProduct(product: Product): void {
+  protected addProduct(product: Product, quantity = 1): void {
     this.saleError.set(null);
     this.cart.update((items) => {
       const existing = items.find((item) => item.product.id === product.id);
       if (existing) {
         return items.map((item) =>
-          item.product.id === product.id ? { ...item, quantity: item.quantity + 1 } : item,
+          item.product.id === product.id ? { ...item, quantity: item.quantity + quantity } : item,
         );
       }
-      return [...items, { product, quantity: 1 }];
+      return [...items, { product, quantity }];
     });
   }
 
@@ -387,6 +436,8 @@ export class CheckoutPage {
     this.sale.set(null);
     this.lastPayment.set(null);
     this.cart.set([]);
+    this.quantityInput.set('1');
+    this.quantityError.set(null);
     this.barcodeTerm.set('');
     this.barcodeError.set(null);
     this.saleError.set(null);

@@ -21,7 +21,7 @@
   - Teste primeiro: testes e2e em `apps/api/test/sales.e2e-spec.ts` verificando `400` para `quantity: 0`, `quantity: -2` e `quantity: 1.5` sem criar `Sale` no banco
   - Arquivos previstos: `apps/api/test/sales.e2e-spec.ts`
 
-- [ ] **Tarefa 2 — Implementar seletor "Nº de unidades [F2]" na `CheckoutPage` e no modal de busca por nome**
+- [x] **Tarefa 2 — Implementar seletor "Nº de unidades [F2]" na `CheckoutPage` e no modal de busca por nome**
   - Cobre: CA1, CA2, CA3, CA4, CA5, CA7
   - Teste primeiro: testes em `checkout.page.spec.ts` cobrindo inclusão de `4` unidades por código de barras, leitor USB (`Enter`) e busca por nome com reset para `1`; soma de `4 + 4 = 8` sem duplicar linha; bloqueio de `0`, `-2`, `1.5` e vazio com `"Informe uma quantidade inteira positiva."` sem chamar API nem alterar carrinho; controle de unidades e prévia `Total N un:` / `Adicionar N un.` no modal de busca; atalho `F2` focando campo de quantidade; e abandono (`Esc`/`404`) com quantidade `4` sem alterar carrinho; falham porque o seletor ainda não existe
   - Arquivos previstos: `apps/web/src/app/features/checkout/pages/checkout.page.ts`, `apps/web/src/app/features/checkout/pages/checkout.page.html`, `apps/web/src/app/features/checkout/pages/checkout.page.spec.ts`
