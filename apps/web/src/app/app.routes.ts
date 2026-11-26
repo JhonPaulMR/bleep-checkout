@@ -18,6 +18,12 @@ export const routes: Routes = [
       import('./features/products/pages/products.page').then((m) => m.ProductsPage),
   },
   {
+    path: 'clientes',
+    canMatch: [roleGuard('MANAGER')],
+    loadComponent: () =>
+      import('./features/customers/pages/customers.page').then((m) => m.CustomersPage),
+  },
+  {
     path: 'operadores',
     canMatch: [roleGuard('MANAGER')],
     loadComponent: () =>

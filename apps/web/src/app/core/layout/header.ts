@@ -10,6 +10,7 @@ interface MenuItem {
 const MENU_BY_ROLE: Record<Role, MenuItem[]> = {
   MANAGER: [
     { label: 'Produtos', path: '/produtos' },
+    { label: 'Clientes', path: '/clientes' },
     { label: 'Operadores', path: '/operadores' },
   ],
   OPERATOR: [{ label: 'Caixa', path: '/caixa' }],
