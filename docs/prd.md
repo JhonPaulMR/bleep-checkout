@@ -207,7 +207,7 @@ Essas relações representam o núcleo do domínio sem definir banco, endpoints 
 
 **Regras relacionadas:** RN10, RN12, RN17
 
-### US12 — Adicionar crédito ao cliente · `Must Have` · `S` · Status: `🟡 Ready`
+### US12 — Adicionar crédito ao cliente · `Must Have` · `S` · Status: `🟢 Live`
 
 **Como** gerente, **eu quero** adicionar crédito a um cliente já cadastrado **para que** ele possa continuar usando o crédito como forma de pagamento.
 
@@ -299,3 +299,4 @@ Essas relações representam o núcleo do domínio sem definir banco, endpoints 
 | 24/11/2026 | 1.1.2 | US06 (Pagar via PIX — integrada ao Mercado Pago Checkout Transparente com Cartão e PIX) passa a 🟢 Live, implementada na Issue #3. |
 | 25/11/2026 | 1.1.3 | US01 (Cadastrar produto — API `POST/GET /products` e tela de Produtos fiel ao protótipo) passa a 🟢 Live, implementada na Issue #1. |
 | 25/11/2026 | 1.1.4 | US02 (Cadastrar cliente com crédito — migration `Customer`/`CreditTransaction`, API `POST/GET /customers` e tela de Clientes fiel ao protótipo) passa a 🟢 Live, implementada na Issue #2. |
+| 26/11/2026 | 1.1.5 | US12 (Adicionar crédito ao cliente — API `POST /customers/:id/credits` com transação `TOP_UP` e modal de recarga na tela de Clientes) passa a 🟢 Live, implementada na Issue #13. |
