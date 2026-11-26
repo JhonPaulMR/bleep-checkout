@@ -107,7 +107,7 @@ Essas relações representam o núcleo do domínio sem definir banco, endpoints 
 
 **Regras relacionadas:** RN05, RN06
 
-### US04 — Inserir quantidade de produtos na venda · `Must Have` · `M` · Status: `🟡 Ready`
+### US04 — Inserir quantidade de produtos na venda · `Must Have` · `M` · Status: `🟢 Live`
 
 **Como** operador de caixa, **eu quero** informar a quantidade antes de inserir um produto **para que** uma única busca, digitação de código ou leitura do produto registre várias unidades de uma vez.
 
@@ -301,3 +301,4 @@ Essas relações representam o núcleo do domínio sem definir banco, endpoints 
 | 25/11/2026 | 1.1.4 | US02 (Cadastrar cliente com crédito — migration `Customer`/`CreditTransaction`, API `POST/GET /customers` e tela de Clientes fiel ao protótipo) passa a 🟢 Live, implementada na Issue #2. |
 | 26/11/2026 | 1.1.5 | US12 (Adicionar crédito ao cliente — API `POST /customers/:id/credits` com transação `TOP_UP` e modal de recarga na tela de Clientes) passa a 🟢 Live, implementada na Issue #13. |
 | 26/11/2026 | 1.1.6 | US03 (Montar venda no simulador de caixa — `GET /products/barcode/:barcode`, `?search=` e PDV fiel a `caixa.html`/`busca.html`) passa a 🟢 Live, implementada na Issue #4. |
+| 26/11/2026 | 1.1.7 | US04 (Inserir quantidade de produtos na venda — seletor "Nº de unidades [F2]" no caixa e no modal de busca por nome) passa a 🟢 Live, implementada na Issue #5. |

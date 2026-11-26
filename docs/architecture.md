@@ -1,7 +1,7 @@
 # 🛠️ Architecture / Software Design Document
 
 **Projeto:** Bleep Checkout
-**Versão:** 1.0.9 · fechamento da US03 (montagem de venda no simulador de caixa)
+**Versão:** 1.0.10 · fechamento da US04 (inserir quantidade de produtos na venda)
 **Última atualização:** 26/11/2026
 
 > 🤖 **O `prd.md` responde _o quê_ o produto faz. Este responde _onde as coisas
@@ -337,6 +337,7 @@ stateDiagram-v2
 | 25/11/2026 | 1.0.7 | Fechamento da US02 (#2): migration de `Customer`, `CreditTransaction` e `Sale.customerId`, API `POST/GET /customers` com transação `INITIAL`, e tela de Clientes fiel ao protótipo navegável |
 | 26/11/2026 | 1.0.8 | Fechamento da US12 (#13): recarga de crédito (`POST /customers/:id/credits` com incremento atômico e `CreditTransaction` `TOP_UP`) e modal de recarga habilitado na tela de Clientes |
 | 26/11/2026 | 1.0.9 | Fechamento da US03 (#4): consulta por código de barras (`GET /products/barcode/:barcode`), filtro `?search=` em `GET /products` e simulador de caixa/modal de busca fiéis a `caixa.html` e `busca.html` |
+| 26/11/2026 | 1.0.10 | Fechamento da US04 (#5): seletor de quantidade prévia (`Nº de unidades [F2]`) no simulador de caixa e no modal de busca por nome + cobertura e2e de rejeição `400` para quantidades inválidas em `POST /sales` |
 
 ---
 
