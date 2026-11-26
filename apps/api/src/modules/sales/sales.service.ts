@@ -12,6 +12,7 @@ import { CreateSaleDto } from './dto/create-sale.dto.js';
 const SALE_DETAILS_INCLUDE = {
   items: { include: { product: true } },
   payments: { orderBy: { createdAt: 'asc' as const } },
+  customer: true,
 } as const;
 
 @Injectable()
@@ -38,6 +39,15 @@ export class SalesService {
     const productIds = Array.from(quantitiesByProductId.keys());
 
     return this.prisma.$transaction(async (tx) => {
+      if (dto.customerId) {
+        const customer = await tx.customer.findUnique({
+          where: { id: dto.customerId },
+        });
+        if (!customer) {
+          throw new UnprocessableEntityException('Cliente não encontrado.');
+        }
+      }
+
       const products = await tx.product.findMany({
         where: {
           id: { in: productIds },
@@ -70,6 +80,7 @@ export class SalesService {
       return tx.sale.create({
         data: {
           operatorId,
+          customerId: dto.customerId ?? null,
           status: SaleStatus.OPEN,
           totalCents,
           items: {

@@ -4,6 +4,7 @@ import {
   UnprocessableEntityException,
 } from '@nestjs/common';
 import {
+  CreditType,
   PaymentMethod,
   PaymentStatus,
   SaleStatus,
@@ -16,11 +17,20 @@ describe('PaymentsService', () => {
   let prisma: {
     sale: {
       findUnique: ReturnType<typeof vi.fn>;
+      findUniqueOrThrow: ReturnType<typeof vi.fn>;
       update: ReturnType<typeof vi.fn>;
+      updateMany: ReturnType<typeof vi.fn>;
     };
     payment: {
       create: ReturnType<typeof vi.fn>;
       update: ReturnType<typeof vi.fn>;
+    };
+    customer: {
+      updateMany: ReturnType<typeof vi.fn>;
+      findUniqueOrThrow: ReturnType<typeof vi.fn>;
+    };
+    creditTransaction: {
+      create: ReturnType<typeof vi.fn>;
     };
     $transaction: ReturnType<typeof vi.fn>;
   };
@@ -56,11 +66,20 @@ describe('PaymentsService', () => {
     prisma = {
       sale: {
         findUnique: vi.fn(),
+        findUniqueOrThrow: vi.fn(),
         update: vi.fn(),
+        updateMany: vi.fn(),
       },
       payment: {
         create: vi.fn(),
         update: vi.fn(),
+      },
+      customer: {
+        updateMany: vi.fn(),
+        findUniqueOrThrow: vi.fn(),
+      },
+      creditTransaction: {
+        create: vi.fn(),
       },
       $transaction: vi.fn(),
     };
@@ -481,5 +500,197 @@ describe('PaymentsService', () => {
         expect(gateway.createPixPayment).not.toHaveBeenCalled();
       },
     );
+  });
+
+  describe('payWithCustomerCredit', () => {
+    const saleWithCustomer = {
+      ...baseSale,
+      customerId: 'cust-1',
+    };
+
+    it('debita saldo via updateMany condicional, cria Payment(CUSTOMER_CREDIT, APPROVED), CreditTransaction(SALE_DEBIT), conclui Sale(COMPLETED) e retorna novo saldo', async () => {
+      prisma.sale.findUnique.mockResolvedValue(saleWithCustomer);
+      prisma.customer.updateMany.mockResolvedValue({ count: 1 });
+      prisma.sale.updateMany.mockResolvedValue({ count: 1 });
+
+      const createdPayment = {
+        id: 'pay-credit-1',
+        saleId: 'sale-1',
+        method: PaymentMethod.CUSTOMER_CREDIT,
+        status: PaymentStatus.APPROVED,
+        amountCents: 3580,
+        gatewayPaymentId: null,
+        qrCode: null,
+        qrCodeBase64: null,
+        createdAt: new Date('2026-11-24T12:10:00.000Z'),
+      };
+      prisma.payment.create.mockResolvedValue(createdPayment);
+      prisma.creditTransaction.create.mockResolvedValue({
+        id: 'ct-1',
+        customerId: 'cust-1',
+        saleId: 'sale-1',
+        type: CreditType.SALE_DEBIT,
+        amountCents: 3580,
+      });
+      prisma.customer.findUniqueOrThrow.mockResolvedValue({
+        id: 'cust-1',
+        name: 'Maria',
+        cpf: '12345678901',
+        balanceCents: 1420,
+      });
+      const updatedSale = {
+        ...saleWithCustomer,
+        status: SaleStatus.COMPLETED,
+        completedAt: new Date('2026-11-24T12:10:01.000Z'),
+        items: [],
+        payments: [createdPayment],
+        customer: {
+          id: 'cust-1',
+          name: 'Maria',
+          cpf: '12345678901',
+          balanceCents: 1420,
+        },
+      };
+      prisma.sale.findUniqueOrThrow.mockResolvedValue(updatedSale);
+
+      const result = await service.payWithCustomerCredit('sale-1', 'op-1');
+
+      expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+      expect(prisma.customer.updateMany).toHaveBeenCalledWith({
+        where: {
+          id: 'cust-1',
+          balanceCents: { gte: 3580 },
+        },
+        data: {
+          balanceCents: { decrement: 3580 },
+        },
+      });
+      expect(prisma.sale.updateMany).toHaveBeenCalledWith({
+        where: {
+          id: 'sale-1',
+          status: SaleStatus.OPEN,
+        },
+        data: {
+          status: SaleStatus.COMPLETED,
+          completedAt: expect.any(Date),
+        },
+      });
+      expect(prisma.payment.create).toHaveBeenCalledWith({
+        data: {
+          saleId: 'sale-1',
+          method: PaymentMethod.CUSTOMER_CREDIT,
+          status: PaymentStatus.APPROVED,
+          amountCents: 3580,
+        },
+      });
+      expect(prisma.creditTransaction.create).toHaveBeenCalledWith({
+        data: {
+          customerId: 'cust-1',
+          saleId: 'sale-1',
+          type: CreditType.SALE_DEBIT,
+          amountCents: 3580,
+        },
+      });
+      expect(prisma.sale.findUniqueOrThrow).toHaveBeenCalledWith({
+        where: { id: 'sale-1' },
+        include: {
+          items: { include: { product: true } },
+          payments: true,
+          customer: true,
+        },
+      });
+      expect(result).toEqual({
+        sale: updatedSale,
+        payment: createdPayment,
+        customerBalanceCents: 1420,
+      });
+    });
+
+    it('rejeita com UnprocessableEntityException("Saldo insuficiente.") quando updateMany condicional retorna count 0', async () => {
+      prisma.sale.findUnique.mockResolvedValue(saleWithCustomer);
+      prisma.customer.updateMany.mockResolvedValue({ count: 0 });
+
+      const error = await service
+        .payWithCustomerCredit('sale-1', 'op-1')
+        .catch((e) => e);
+
+      expect(error).toBeInstanceOf(UnprocessableEntityException);
+      expect((error as UnprocessableEntityException).message).toBe(
+        'Saldo insuficiente.',
+      );
+      expect(prisma.sale.updateMany).not.toHaveBeenCalled();
+      expect(prisma.payment.create).not.toHaveBeenCalled();
+      expect(prisma.creditTransaction.create).not.toHaveBeenCalled();
+    });
+
+    it('rejeita com UnprocessableEntityException("Selecione um cliente para pagar com crédito.") quando a venda não tem customerId', async () => {
+      prisma.sale.findUnique.mockResolvedValue({
+        ...baseSale,
+        customerId: null,
+      });
+
+      const error = await service
+        .payWithCustomerCredit('sale-1', 'op-1')
+        .catch((e) => e);
+
+      expect(error).toBeInstanceOf(UnprocessableEntityException);
+      expect((error as UnprocessableEntityException).message).toBe(
+        'Selecione um cliente para pagar com crédito.',
+      );
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
+
+    it('rejeita com NotFoundException quando a venda não existe', async () => {
+      prisma.sale.findUnique.mockResolvedValue(null);
+
+      const error = await service
+        .payWithCustomerCredit('sale-inexistente', 'op-1')
+        .catch((e) => e);
+
+      expect(error).toBeInstanceOf(NotFoundException);
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
+
+    it('rejeita com ForbiddenException quando outro operador tenta cobrar a venda', async () => {
+      prisma.sale.findUnique.mockResolvedValue(saleWithCustomer);
+
+      const error = await service
+        .payWithCustomerCredit('sale-1', 'op-2')
+        .catch((e) => e);
+
+      expect(error).toBeInstanceOf(ForbiddenException);
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
+
+    it.each([SaleStatus.COMPLETED, SaleStatus.PENDING, SaleStatus.CANCELED])(
+      'rejeita com UnprocessableEntityException quando a venda está em %s',
+      async (status) => {
+        prisma.sale.findUnique.mockResolvedValue({
+          ...saleWithCustomer,
+          status,
+        });
+
+        const error = await service
+          .payWithCustomerCredit('sale-1', 'op-1')
+          .catch((e) => e);
+
+        expect(error).toBeInstanceOf(UnprocessableEntityException);
+        expect(prisma.$transaction).not.toHaveBeenCalled();
+      },
+    );
+
+    it('rejeita com UnprocessableEntityException quando venda deixa de estar OPEN dentro da transação', async () => {
+      prisma.sale.findUnique.mockResolvedValue(saleWithCustomer);
+      prisma.customer.updateMany.mockResolvedValue({ count: 1 });
+      prisma.sale.updateMany.mockResolvedValue({ count: 0 });
+
+      const error = await service
+        .payWithCustomerCredit('sale-1', 'op-1')
+        .catch((e) => e);
+
+      expect(error).toBeInstanceOf(UnprocessableEntityException);
+      expect(prisma.payment.create).not.toHaveBeenCalled();
+      expect(prisma.creditTransaction.create).not.toHaveBeenCalled();
+    });
   });
 });

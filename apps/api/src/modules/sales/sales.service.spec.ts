@@ -13,6 +13,9 @@ describe('SalesService', () => {
     product: {
       findMany: ReturnType<typeof vi.fn>;
     };
+    customer: {
+      findUnique: ReturnType<typeof vi.fn>;
+    };
     sale: {
       create: ReturnType<typeof vi.fn>;
       findUnique: ReturnType<typeof vi.fn>;
@@ -25,6 +28,9 @@ describe('SalesService', () => {
     prisma = {
       product: {
         findMany: vi.fn(),
+      },
+      customer: {
+        findUnique: vi.fn(),
       },
       sale: {
         create: vi.fn(),
@@ -108,6 +114,7 @@ describe('SalesService', () => {
       expect(prisma.sale.create).toHaveBeenCalledWith({
         data: {
           operatorId: 'op-1',
+          customerId: null,
           status: SaleStatus.OPEN,
           totalCents: 5470,
           items: {
@@ -120,6 +127,7 @@ describe('SalesService', () => {
         include: {
           items: { include: { product: true } },
           payments: { orderBy: { createdAt: 'asc' } },
+          customer: true,
         },
       });
       expect(result).toEqual(createdSale);
@@ -217,6 +225,91 @@ describe('SalesService', () => {
       expect(error).toBeInstanceOf(UnprocessableEntityException);
       expect(prisma.sale.create).not.toHaveBeenCalled();
     });
+
+    it('vincula customerId quando informado e existente', async () => {
+      const customer = {
+        id: 'cust-1',
+        name: 'Maria Silva',
+        cpf: '12345678901',
+        balanceCents: 5000,
+      };
+      prisma.customer.findUnique.mockResolvedValue(customer);
+      prisma.product.findMany.mockResolvedValue([
+        {
+          id: 'prod-1',
+          name: 'Café 500g',
+          barcode: '7890000000001',
+          priceCents: 1850,
+          active: true,
+        },
+      ]);
+      const createdSale = {
+        id: 'sale-cust-1',
+        number: 2,
+        operatorId: 'op-1',
+        customerId: 'cust-1',
+        customer,
+        status: SaleStatus.OPEN,
+        totalCents: 1850,
+        items: [],
+        payments: [],
+      };
+      prisma.sale.create.mockResolvedValue(createdSale);
+
+      const result = await service.create(
+        {
+          items: [{ productId: 'prod-1', quantity: 1 }],
+          customerId: 'cust-1',
+        },
+        'op-1',
+      );
+
+      expect(prisma.customer.findUnique).toHaveBeenCalledWith({
+        where: { id: 'cust-1' },
+      });
+      expect(prisma.sale.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            customerId: 'cust-1',
+          }),
+          include: {
+            items: { include: { product: true } },
+            payments: { orderBy: { createdAt: 'asc' } },
+            customer: true,
+          },
+        }),
+      );
+      expect(result).toEqual(createdSale);
+    });
+
+    it('rejeita com UnprocessableEntityException quando customerId não existe', async () => {
+      prisma.customer.findUnique.mockResolvedValue(null);
+      prisma.product.findMany.mockResolvedValue([
+        {
+          id: 'prod-1',
+          name: 'Café 500g',
+          barcode: '7890000000001',
+          priceCents: 1850,
+          active: true,
+        },
+      ]);
+
+      const error = await service
+        .create(
+          {
+            items: [{ productId: 'prod-1', quantity: 1 }],
+            customerId: 'cust-inexistente',
+          },
+          'op-1',
+        )
+        .catch((e) => e);
+
+      expect(error).toBeInstanceOf(UnprocessableEntityException);
+      expect((error as UnprocessableEntityException).message).toBe(
+        'Cliente não encontrado.',
+      );
+      expect(prisma.sale.create).not.toHaveBeenCalled();
+    });
   });
 
   describe('findByIdForOperator', () => {
@@ -239,6 +332,7 @@ describe('SalesService', () => {
         include: {
           items: { include: { product: true } },
           payments: { orderBy: { createdAt: 'asc' } },
+          customer: true,
         },
       });
       expect(result).toEqual(sale);

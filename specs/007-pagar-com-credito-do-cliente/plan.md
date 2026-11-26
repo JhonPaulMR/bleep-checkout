@@ -25,7 +25,7 @@
 
 ## Tarefas
 
-- [ ] **Tarefa 1 — Suportar `customerId` opcional em `POST /sales` e implementar `POST /sales/:id/payments/credit` na API (unit + e2e)**
+- [x] **Tarefa 1 — Suportar `customerId` opcional em `POST /sales` e implementar `POST /sales/:id/payments/credit` na API (unit + e2e)**
   - Cobre: CA1 (lado da API + transação atômica), CA2 (lado da API — `422` saldo insuficiente sem alterar saldo), CA3 (lado da API — `422` sem cliente), CA4 (lado da API — venda não `OPEN`), CA5 (lado da API — `customerId` em `POST /sales`), CA6 (`401`/`403`/`404`)
   - Teste primeiro: testes unitários em `sales.service.spec.ts` e `payments.service.spec.ts` (`payWithCustomerCredit` debitando via `updateMany` condicional, gravando `Payment(CUSTOMER_CREDIT, APPROVED)` + `CreditTransaction(SALE_DEBIT)` + `Sale(COMPLETED)`; `422` quando `count === 0` por saldo insuficiente, sem cliente ou venda não `OPEN`; `403` outro operador; `404` venda inexistente) e testes e2e em `apps/api/test/sales.e2e-spec.ts` e `apps/api/test/payments.e2e-spec.ts` contra PostgreSQL real; falham porque DTO e endpoint ainda não existem
   - Arquivos previstos: `apps/api/src/modules/sales/dto/create-sale.dto.ts`, `apps/api/src/modules/sales/sales.service.ts`, `apps/api/src/modules/sales/sales.service.spec.ts`, `apps/api/src/modules/payments/payments.controller.ts`, `apps/api/src/modules/payments/payments.service.ts`, `apps/api/src/modules/payments/payments.service.spec.ts`, `apps/api/test/sales.e2e-spec.ts`, `apps/api/test/payments.e2e-spec.ts`

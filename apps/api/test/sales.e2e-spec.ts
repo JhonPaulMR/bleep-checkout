@@ -15,6 +15,7 @@ describe('Catálogo mínimo e vendas — /products e /sales (e2e)', () => {
 
   const createdSaleIds: string[] = [];
   const createdProductIds: string[] = [];
+  const createdCustomerIds: string[] = [];
   const createdUserIds: string[] = [];
 
   const login = async (email: string, password: string) => {
@@ -59,6 +60,19 @@ describe('Catálogo mínimo e vendas — /products e /sales (e2e)', () => {
     return { user, email, password };
   }
 
+  async function createTestCustomer(balanceCents = 5000) {
+    const cpf = `${Date.now()}${Math.floor(Math.random() * 100)}`.slice(-11);
+    const customer = await prisma.customer.create({
+      data: {
+        name: `Cliente Venda ${cpf}`,
+        cpf,
+        balanceCents,
+      },
+    });
+    createdCustomerIds.push(customer.id);
+    return customer;
+  }
+
   beforeAll(async () => {
     execSync('npx prisma db seed', { stdio: 'pipe' });
     const moduleRef = await Test.createTestingModule({
@@ -87,6 +101,12 @@ describe('Catálogo mínimo e vendas — /products e /sales (e2e)', () => {
         where: { id: { in: createdProductIds } },
       });
       createdProductIds.length = 0;
+    }
+    if (createdCustomerIds.length > 0) {
+      await prisma.customer.deleteMany({
+        where: { id: { in: createdCustomerIds } },
+      });
+      createdCustomerIds.length = 0;
     }
     if (createdUserIds.length > 0) {
       await prisma.user.deleteMany({
@@ -304,6 +324,52 @@ describe('Catálogo mínimo e vendas — /products e /sales (e2e)', () => {
         .set('Authorization', `Bearer ${managerToken}`)
         .send({ items: [{ productId: prod.id, quantity: 1 }] })
         .expect(403);
+    });
+
+    it('vincula customerId válido na venda e devolve customer no payload (201)', async () => {
+      const operatorToken = await login(
+        process.env.SEED_OPERATOR_EMAIL!,
+        process.env.SEED_OPERATOR_PASSWORD!,
+      );
+      const prod = await createTestProduct({ priceCents: 1500 });
+      const customer = await createTestCustomer(4000);
+
+      const response = await request(app.getHttpServer())
+        .post('/sales')
+        .set('Authorization', `Bearer ${operatorToken}`)
+        .send({
+          items: [{ productId: prod.id, quantity: 2 }],
+          customerId: customer.id,
+        })
+        .expect(201);
+
+      createdSaleIds.push(response.body.data.id);
+      expect(response.body.data.customerId).toBe(customer.id);
+      expect(response.body.data.customer).toMatchObject({
+        id: customer.id,
+        name: customer.name,
+        cpf: customer.cpf,
+        balanceCents: 4000,
+      });
+    });
+
+    it('devolve 422 quando customerId não existe', async () => {
+      const operatorToken = await login(
+        process.env.SEED_OPERATOR_EMAIL!,
+        process.env.SEED_OPERATOR_PASSWORD!,
+      );
+      const prod = await createTestProduct({ priceCents: 1500 });
+
+      const response = await request(app.getHttpServer())
+        .post('/sales')
+        .set('Authorization', `Bearer ${operatorToken}`)
+        .send({
+          items: [{ productId: prod.id, quantity: 1 }],
+          customerId: randomUUID(),
+        })
+        .expect(422);
+
+      expect(response.body.message).toBe('Cliente não encontrado.');
     });
   });
 
