@@ -338,6 +338,88 @@ describe('CheckoutService', () => {
     expect(result).toEqual(response);
   });
 
+  it('payExternal() faz POST /sales/:id/payments/external com EXTERNAL_CREDIT e approved: true enviando apenas { method, approved } e desembrulha { data }', () => {
+    let result: PaymentResponse | undefined;
+    const response: PaymentResponse = {
+      payment: {
+        id: 'pay-ext-1',
+        saleId: 'sale-1',
+        method: 'EXTERNAL_CREDIT',
+        status: 'APPROVED',
+        amountCents: 2500,
+        gatewayPaymentId: null,
+        qrCode: null,
+        qrCodeBase64: null,
+        createdAt: '2026-11-24T10:06:00.000Z',
+      },
+      sale: {
+        ...sampleSale,
+        status: 'COMPLETED',
+        completedAt: '2026-11-24T10:06:01.000Z',
+      },
+    };
+
+    const payloadWithExtra = {
+      method: 'EXTERNAL_CREDIT' as const,
+      approved: true,
+      amountCents: 1,
+    };
+
+    service.payExternal('sale-1', payloadWithExtra).subscribe((res) => {
+      result = res;
+    });
+
+    const req = controller.expectOne(`${apiUrl}/sales/sale-1/payments/external`);
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body).toEqual({
+      method: 'EXTERNAL_CREDIT',
+      approved: true,
+    });
+    expect(req.request.body).not.toHaveProperty('amountCents');
+    req.flush({ data: response });
+
+    expect(result).toEqual(response);
+  });
+
+  it('payExternal() faz POST /sales/:id/payments/external com EXTERNAL_DEBIT e approved: false, codificando saleId, e desembrulha { data }', () => {
+    let result: PaymentResponse | undefined;
+    const response: PaymentResponse = {
+      payment: {
+        id: 'pay-ext-2',
+        saleId: 'sale/1',
+        method: 'EXTERNAL_DEBIT',
+        status: 'DECLINED',
+        amountCents: 2500,
+        gatewayPaymentId: null,
+        qrCode: null,
+        qrCodeBase64: null,
+        createdAt: '2026-11-24T10:06:00.000Z',
+      },
+      sale: {
+        ...sampleSale,
+        id: 'sale/1',
+        status: 'OPEN',
+        completedAt: null,
+      },
+    };
+
+    service
+      .payExternal('sale/1', { method: 'EXTERNAL_DEBIT', approved: false })
+      .subscribe((res) => {
+        result = res;
+      });
+
+    const req = controller.expectOne(`${apiUrl}/sales/sale%2F1/payments/external`);
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body).toEqual({
+      method: 'EXTERNAL_DEBIT',
+      approved: false,
+    });
+    req.flush({ data: response });
+
+    expect(result).toEqual(response);
+  });
+
   it('getSale() faz GET /sales/:id e desembrulha { data }', () => {
     let result: Sale | undefined;
 

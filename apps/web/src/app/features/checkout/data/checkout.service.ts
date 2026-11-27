@@ -21,6 +21,8 @@ export type PaymentMethod =
   | 'EXTERNAL_CREDIT'
   | 'EXTERNAL_DEBIT';
 
+export type ExternalPaymentMethod = 'EXTERNAL_CREDIT' | 'EXTERNAL_DEBIT';
+
 export type PaymentStatus = 'PENDING' | 'APPROVED' | 'DECLINED' | 'ABANDONED';
 
 export interface Product {
@@ -93,6 +95,11 @@ export interface PayWithCardPayload {
     number: string;
   };
   payerEmail?: string;
+}
+
+export interface PayExternalPayload {
+  method: ExternalPaymentMethod;
+  approved: boolean;
 }
 
 export interface PaymentResponse {
@@ -209,6 +216,20 @@ export class CheckoutService {
       .post<{ data: CustomerCreditPaymentResult }>(
         `${this.apiUrl}/sales/${encodeURIComponent(saleId)}/payments/credit`,
         {},
+      )
+      .pipe(map((response) => response.data));
+  }
+
+  payExternal(saleId: string, payload: PayExternalPayload): Observable<PaymentResponse> {
+    const sanitizedPayload: PayExternalPayload = {
+      method: payload.method,
+      approved: payload.approved,
+    };
+
+    return this.http
+      .post<{ data: PaymentResponse }>(
+        `${this.apiUrl}/sales/${encodeURIComponent(saleId)}/payments/external`,
+        sanitizedPayload,
       )
       .pipe(map((response) => response.data));
   }

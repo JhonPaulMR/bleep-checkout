@@ -38,7 +38,7 @@
   - Teste primeiro: testes unitários em `payments.service.spec.ts` e testes e2e em `apps/api/test/payments.e2e-spec.ts` contra PostgreSQL real cobrindo `EXTERNAL_CREDIT` e `EXTERNAL_DEBIT` com `approved: true` e `approved: false`, `400` para `method` inválido ou `approved` ausente/não booleano, `403` (`MANAGER` e outro `OPERATOR`), `404` venda inexistente e `422` venda já `COMPLETED`/`PENDING`/`CANCELED`; falham porque o DTO, o método de serviço e a rota ainda não existem
   - Arquivos previstos: `apps/api/src/modules/payments/dto/pay-external.dto.ts`, `apps/api/src/modules/payments/payments.controller.ts`, `apps/api/src/modules/payments/payments.service.ts`, `apps/api/src/modules/payments/payments.service.spec.ts`, `apps/api/test/payments.e2e-spec.ts`
 
-- [ ] **Tarefa 2 — Adicionar `payExternal()` ao `CheckoutService`**
+- [x] **Tarefa 2 — Adicionar `payExternal()` ao `CheckoutService`**
   - Cobre: CA1 (chamada de aprovação externa), CA2 (chamada de não aprovação externa), CA3 (envio estrito do payload `{ method, approved }` somente mediante invocação explícita)
   - Teste primeiro: testes unitários em `checkout.service.spec.ts` verificando `payExternal(saleId, { method: 'EXTERNAL_CREDIT', approved: true })` e `payExternal(saleId, { method: 'EXTERNAL_DEBIT', approved: false })` enviando `POST /sales/:id/payments/external` com `{ method, approved }` e desembrulhando `{ data }`; falham porque `payExternal` ainda não existe
   - Arquivos previstos: `apps/web/src/app/features/checkout/data/checkout.service.ts`, `apps/web/src/app/features/checkout/data/checkout.service.spec.ts`
