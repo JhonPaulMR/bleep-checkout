@@ -93,6 +93,17 @@ export class SalesService {
     });
   }
 
+  async findAllForOperator(operatorId: string, status?: SaleStatus) {
+    return this.prisma.sale.findMany({
+      where: {
+        operatorId,
+        ...(status ? { status } : {}),
+      },
+      orderBy: { createdAt: 'desc' },
+      include: SALE_DETAILS_INCLUDE,
+    });
+  }
+
   async findByIdForOperator(id: string, requesterId: string) {
     const sale = await this.prisma.sale.findUnique({
       where: { id },
@@ -146,6 +157,60 @@ export class SalesService {
           throw new NotFoundException('Venda não encontrada.');
         }
         this.throwUncancelableStatus(current.status);
+      }
+
+      await tx.payment.updateMany({
+        where: {
+          saleId: sale.id,
+          status: PaymentStatus.PENDING,
+        },
+        data: { status: PaymentStatus.ABANDONED },
+      });
+
+      return tx.sale.findUniqueOrThrow({
+        where: { id: sale.id },
+        include: SALE_DETAILS_INCLUDE,
+      });
+    });
+  }
+
+  async reopen(id: string, requesterId: string) {
+    const sale = await this.prisma.sale.findUnique({
+      where: { id },
+    });
+
+    if (!sale) {
+      throw new NotFoundException('Venda não encontrada.');
+    }
+
+    if (sale.operatorId !== requesterId) {
+      throw new ForbiddenException(
+        'Você não tem permissão para reabrir esta venda.',
+      );
+    }
+
+    if (
+      sale.status !== SaleStatus.PENDING ||
+      !canTransitionSale(sale.status, SaleStatus.OPEN)
+    ) {
+      throw new UnprocessableEntityException(
+        'A venda não está pendente para reabertura.',
+      );
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      const updated = await tx.sale.updateMany({
+        where: {
+          id: sale.id,
+          status: SaleStatus.PENDING,
+        },
+        data: { status: SaleStatus.OPEN },
+      });
+
+      if (updated.count === 0) {
+        throw new UnprocessableEntityException(
+          'A venda não está pendente para reabertura.',
+        );
       }
 
       await tx.payment.updateMany({

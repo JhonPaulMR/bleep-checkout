@@ -172,6 +172,12 @@ export class CheckoutService {
       .pipe(map((response) => response.data));
   }
 
+  reopenSale(saleId: string): Observable<Sale> {
+    return this.http
+      .post<{ data: Sale }>(`${this.apiUrl}/sales/${encodeURIComponent(saleId)}/reopen`, {})
+      .pipe(map((response) => response.data));
+  }
+
   pollSaleUntilSettled(saleId: string, intervalMs = 3000): Observable<Sale> {
     return interval(intervalMs).pipe(
       switchMap(() =>

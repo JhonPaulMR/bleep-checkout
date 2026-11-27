@@ -35,6 +35,12 @@ export const routes: Routes = [
     loadComponent: () =>
       import('./features/checkout/pages/checkout.page').then((m) => m.CheckoutPage),
   },
+  {
+    path: 'pendentes',
+    canMatch: [roleGuard('OPERATOR')],
+    loadComponent: () =>
+      import('./features/pending-sales/pages/pending-sales.page').then((m) => m.PendingSalesPage),
+  },
   { path: '', pathMatch: 'full', redirectTo: 'login' },
   { path: '**', redirectTo: 'login' },
 ];

@@ -7,10 +7,12 @@ import {
   ElementRef,
   inject,
   Injector,
+  OnInit,
   signal,
   viewChild,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { ActivatedRoute } from '@angular/router';
 import { firstValueFrom, Subscription } from 'rxjs';
 import { AuthService } from '../../../core/auth/auth.service';
 import {
@@ -112,9 +114,10 @@ interface WindowWithMercadoPago extends Window {
     '(window:keydown)': 'onWindowKeydown($event)',
   },
 })
-export class CheckoutPage {
+export class CheckoutPage implements OnInit {
   private readonly auth = inject(AuthService);
   private readonly checkoutService = inject(CheckoutService);
+  private readonly route = inject(ActivatedRoute, { optional: true });
   private readonly destroyRef = inject(DestroyRef);
   private readonly injector = inject(Injector);
   private readonly barcodeInputEl = viewChild<ElementRef<HTMLInputElement>>('barcodeInput');
@@ -180,6 +183,9 @@ export class CheckoutPage {
 
   protected readonly creatingSale = signal(false);
   protected readonly saleError = signal<string | null>(null);
+  protected readonly loadingSale = signal(false);
+  protected readonly loadSaleError = signal<string | null>(null);
+  private pendingLoadSaleId: string | null = null;
 
   protected readonly sale = signal<Sale | null>(null);
   protected readonly lastPayment = signal<Payment | null>(null);
@@ -192,6 +198,10 @@ export class CheckoutPage {
   protected readonly cancelConfirmMode = signal<CancelConfirmMode>(null);
   protected readonly cancelingSale = signal(false);
   protected readonly cancelError = signal<string | null>(null);
+
+  protected readonly reopenConfirmOpen = signal(false);
+  protected readonly reopeningSale = signal(false);
+  protected readonly reopenError = signal<string | null>(null);
 
   protected readonly brickLoading = signal(false);
   protected readonly submittingPayment = signal(false);
@@ -264,8 +274,20 @@ export class CheckoutPage {
     });
   }
 
+  ngOnInit(): void {
+    const saleId = this.route?.snapshot.queryParamMap.get('saleId')?.trim();
+    if (saleId) {
+      this.loadSaleById(saleId);
+    }
+  }
+
   protected onWindowKeydown(event: KeyboardEvent): void {
     if (event.key === 'Escape') {
+      if (this.reopenConfirmOpen()) {
+        event.preventDefault();
+        this.closeReopenConfirm();
+        return;
+      }
       if (this.cancelConfirmMode() !== null) {
         event.preventDefault();
         this.closeCancelConfirm();
@@ -284,7 +306,12 @@ export class CheckoutPage {
     }
 
     const anyModalOpen =
-      this.searchModalOpen() || this.customerModalOpen() || this.cancelConfirmMode() !== null;
+      this.searchModalOpen() ||
+      this.customerModalOpen() ||
+      this.cancelConfirmMode() !== null ||
+      this.reopenConfirmOpen() ||
+      this.loadingSale() ||
+      this.loadSaleError() !== null;
 
     if (event.key === 'F2' && !this.sale() && !anyModalOpen) {
       event.preventDefault();
@@ -703,7 +730,8 @@ export class CheckoutPage {
       !currentSale ||
       (currentSale.status !== 'OPEN' && currentSale.status !== 'PENDING') ||
       this.submittingPayment() ||
-      this.cancelingSale()
+      this.cancelingSale() ||
+      this.reopeningSale()
     ) {
       return;
     }
@@ -776,10 +804,76 @@ export class CheckoutPage {
     }
   }
 
+  protected openReopenConfirm(): void {
+    const currentSale = this.sale();
+    if (
+      !currentSale ||
+      currentSale.status !== 'PENDING' ||
+      !this.isPixPending() ||
+      this.submittingPayment() ||
+      this.cancelingSale() ||
+      this.reopeningSale()
+    ) {
+      return;
+    }
+    this.reopenError.set(null);
+    this.reopenConfirmOpen.set(true);
+  }
+
+  protected closeReopenConfirm(): void {
+    if (this.reopeningSale()) return;
+    this.reopenConfirmOpen.set(false);
+    this.reopenError.set(null);
+  }
+
+  protected onReopenModalBackdropClick(event: MouseEvent): void {
+    if (event.target === event.currentTarget && !this.reopeningSale()) {
+      this.closeReopenConfirm();
+    }
+  }
+
+  protected confirmReopen(): void {
+    const currentSale = this.sale();
+    if (!currentSale || currentSale.status !== 'PENDING' || this.reopeningSale()) {
+      return;
+    }
+
+    this.reopenError.set(null);
+    this.reopeningSale.set(true);
+
+    this.checkoutService.reopenSale(currentSale.id).subscribe({
+      next: (reopenedSale) => {
+        this.reopeningSale.set(false);
+        this.reopenConfirmOpen.set(false);
+        this.reopenError.set(null);
+        this.stopPolling();
+        this.sale.set(reopenedSale);
+        this.lastPayment.set(null);
+        this.copiedPixCode.set(false);
+        this.paymentError.set(null);
+        this.declinedMessage.set(null);
+        this.selectedMethod.set('CARD');
+        this.initializeCardBrick(reopenedSale);
+      },
+      error: (err: unknown) => {
+        this.reopeningSale.set(false);
+        if (err instanceof HttpErrorResponse && err.status === 401) return;
+        this.reopenError.set(this.extractErrorMessage(err));
+      },
+    });
+  }
+
+  protected retryLoadSale(): void {
+    if (!this.pendingLoadSaleId || this.loadingSale()) return;
+    this.loadSaleById(this.pendingLoadSaleId);
+  }
+
   protected startNewSale(): void {
-    // TODO #12: vendas deixadas em PENDING permanecem no banco para retomada ou cancelamento na tela de Vendas Pendentes (US11).
     this.stopPolling();
     this.unmountCardBrick();
+    this.loadingSale.set(false);
+    this.loadSaleError.set(null);
+    this.pendingLoadSaleId = null;
     this.sale.set(null);
     this.lastPayment.set(null);
     this.cart.set([]);
@@ -800,6 +894,71 @@ export class CheckoutPage {
     this.cancelConfirmMode.set(null);
     this.cancelingSale.set(false);
     this.cancelError.set(null);
+    this.reopenConfirmOpen.set(false);
+    this.reopeningSale.set(false);
+    this.reopenError.set(null);
+  }
+
+  private loadSaleById(saleId: string): void {
+    this.pendingLoadSaleId = saleId;
+    this.loadingSale.set(true);
+    this.loadSaleError.set(null);
+
+    this.checkoutService.getSale(saleId).subscribe({
+      next: (loadedSale) => {
+        this.loadingSale.set(false);
+        this.loadSaleError.set(null);
+        this.pendingLoadSaleId = null;
+        this.restoreLoadedSale(loadedSale);
+      },
+      error: (err: unknown) => {
+        this.loadingSale.set(false);
+        if (err instanceof HttpErrorResponse && err.status === 401) return;
+        this.loadSaleError.set(this.extractErrorMessage(err));
+      },
+    });
+  }
+
+  private restoreLoadedSale(loadedSale: Sale): void {
+    this.stopPolling();
+    this.unmountCardBrick();
+    this.sale.set(loadedSale);
+    this.lastPayment.set(this.pickRelevantPayment(loadedSale));
+    this.selectedCustomer.set(loadedSale.customer ?? null);
+    this.completedCustomerBalanceCents.set(null);
+    this.paymentError.set(null);
+    this.declinedMessage.set(null);
+    this.copiedPixCode.set(false);
+    this.cancelConfirmMode.set(null);
+    this.cancelError.set(null);
+    this.reopenConfirmOpen.set(false);
+    this.reopenError.set(null);
+
+    if (loadedSale.status === 'PENDING') {
+      this.startPolling(loadedSale.id);
+    } else if (loadedSale.status === 'OPEN') {
+      this.selectedMethod.set('CARD');
+      this.initializeCardBrick(loadedSale);
+    }
+  }
+
+  private pickRelevantPayment(sale: Sale): Payment | null {
+    const payments = sale.payments ?? [];
+    if (payments.length === 0) return null;
+
+    const byNewest = (a: Payment, b: Payment) => b.createdAt.localeCompare(a.createdAt);
+
+    if (sale.status === 'PENDING') {
+      const pendingPayments = payments.filter((p) => p.status === 'PENDING').sort(byNewest);
+      return pendingPayments[0] ?? null;
+    }
+
+    if (sale.status === 'COMPLETED') {
+      const approvedPayments = payments.filter((p) => p.status === 'APPROVED').sort(byNewest);
+      return approvedPayments[0] ?? null;
+    }
+
+    return null;
   }
 
   private initializeCardBrick(currentSale: Sale): void {
@@ -973,6 +1132,8 @@ export class CheckoutPage {
         if (updatedSale.status !== 'PENDING') {
           this.sale.set(updatedSale);
           this.stopPolling();
+          this.reopenConfirmOpen.set(false);
+          this.reopenError.set(null);
           if (updatedSale.status === 'COMPLETED' || updatedSale.status === 'CANCELED') {
             this.cancelConfirmMode.set(null);
             this.cancelError.set(null);

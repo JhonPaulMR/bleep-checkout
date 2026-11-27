@@ -1,7 +1,7 @@
 import { HttpErrorResponse, provideHttpClient, withInterceptors } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
-import { provideRouter, Router } from '@angular/router';
+import { ActivatedRoute, convertToParamMap, provideRouter, Router } from '@angular/router';
 import { Observable, of, Subject, throwError } from 'rxjs';
 import { authInterceptor } from '../../../core/auth/auth.interceptor';
 import { AuthService } from '../../../core/auth/auth.service';
@@ -36,6 +36,7 @@ describe('CheckoutPage', () => {
   let searchProductsSpy: ReturnType<typeof vi.fn>;
   let listCustomersSpy: ReturnType<typeof vi.fn>;
   let createSaleSpy: ReturnType<typeof vi.fn>;
+  let getSaleSpy: ReturnType<typeof vi.fn>;
   let pollSaleUntilSettledSpy: ReturnType<typeof vi.fn>;
   let getPaymentConfigSpy: ReturnType<typeof vi.fn>;
   let payWithCardSpy: ReturnType<typeof vi.fn>;
@@ -43,6 +44,7 @@ describe('CheckoutPage', () => {
   let payWithCustomerCreditSpy: ReturnType<typeof vi.fn>;
   let payExternalSpy: ReturnType<typeof vi.fn>;
   let cancelSaleSpy: ReturnType<typeof vi.fn>;
+  let reopenSaleSpy: ReturnType<typeof vi.fn>;
 
   let brickCreateSpy: ReturnType<typeof vi.fn>;
   let brickUnmountSpy: ReturnType<typeof vi.fn<() => void>>;
@@ -104,7 +106,7 @@ describe('CheckoutPage', () => {
     payments: [],
   };
 
-  function setup(options?: { operatorName?: string }) {
+  function setup(options?: { operatorName?: string; saleId?: string; getSale$?: Observable<Sale> }) {
     capturedBrickConfig = null;
     brickUnmountSpy = vi.fn<() => void>();
     brickCreateSpy = vi.fn().mockImplementation(
@@ -146,6 +148,7 @@ describe('CheckoutPage', () => {
     });
     listCustomersSpy = vi.fn().mockReturnValue(of(sampleCustomers));
     createSaleSpy = vi.fn().mockReturnValue(of(openSale));
+    getSaleSpy = vi.fn().mockReturnValue(options?.getSale$ ?? of(openSale));
     pollSaleUntilSettledSpy = vi.fn().mockReturnValue(new Subject<Sale>().asObservable());
     getPaymentConfigSpy = vi.fn().mockReturnValue(of({ publicKey: 'TEST-public-key-123' }));
     payWithCardSpy = vi.fn();
@@ -153,27 +156,43 @@ describe('CheckoutPage', () => {
     payWithCustomerCreditSpy = vi.fn();
     payExternalSpy = vi.fn();
     cancelSaleSpy = vi.fn();
+    reopenSaleSpy = vi.fn();
+
+    const providers: unknown[] = [
+      {
+        provide: CheckoutService,
+        useValue: {
+          findProductByBarcode: findProductByBarcodeSpy,
+          searchProducts: searchProductsSpy,
+          listCustomers: listCustomersSpy,
+          createSale: createSaleSpy,
+          getSale: getSaleSpy,
+          pollSaleUntilSettled: pollSaleUntilSettledSpy,
+          getPaymentConfig: getPaymentConfigSpy,
+          payWithCard: payWithCardSpy,
+          payWithPix: payWithPixSpy,
+          payWithCustomerCredit: payWithCustomerCreditSpy,
+          payExternal: payExternalSpy,
+          cancelSale: cancelSaleSpy,
+          reopenSale: reopenSaleSpy,
+        },
+      },
+    ];
+
+    if (options?.saleId !== undefined) {
+      providers.push({
+        provide: ActivatedRoute,
+        useValue: {
+          snapshot: {
+            queryParamMap: convertToParamMap({ saleId: options.saleId }),
+          },
+        },
+      });
+    }
 
     TestBed.configureTestingModule({
       imports: [CheckoutPage],
-      providers: [
-        {
-          provide: CheckoutService,
-          useValue: {
-            findProductByBarcode: findProductByBarcodeSpy,
-            searchProducts: searchProductsSpy,
-            listCustomers: listCustomersSpy,
-            createSale: createSaleSpy,
-            pollSaleUntilSettled: pollSaleUntilSettledSpy,
-            getPaymentConfig: getPaymentConfigSpy,
-            payWithCard: payWithCardSpy,
-            payWithPix: payWithPixSpy,
-            payWithCustomerCredit: payWithCustomerCreditSpy,
-            payExternal: payExternalSpy,
-            cancelSale: cancelSaleSpy,
-          },
-        },
-      ],
+      providers: providers as never[],
     });
 
     if (options?.operatorName) {
@@ -2336,5 +2355,352 @@ describe('CheckoutPage', () => {
     expect(el.querySelector('[data-testid="sale-status-badge"]')?.textContent).toContain(
       'Cancelada — nenhum valor recebido',
     );
+  });
+
+  it('US11 CA3: ao iniciar com ?saleId=<id> de venda PENDING, carrega via getSale, exibe o mesmo QR Code PIX sem chamar payWithPix e retoma o polling até confirmação', () => {
+    const pendingPixSale: Sale = {
+      ...openSale,
+      id: 'sale-pending-1',
+      number: 77,
+      status: 'PENDING',
+      payments: [
+        {
+          id: 'pay-abandoned',
+          saleId: 'sale-pending-1',
+          method: 'PIX',
+          status: 'ABANDONED',
+          amountCents: 2500,
+          gatewayPaymentId: 'mp-old',
+          qrCode: '000201-old-code',
+          qrCodeBase64: 'OLD_BASE64',
+          createdAt: '2026-11-27T10:00:00.000Z',
+        },
+        {
+          id: 'pay-pix-pending',
+          saleId: 'sale-pending-1',
+          method: 'PIX',
+          status: 'PENDING',
+          amountCents: 2500,
+          gatewayPaymentId: 'mp-pix-77',
+          qrCode: '00020126330014br.gov.bcb.pix-retomado',
+          qrCodeBase64: 'RETOMADO_BASE64_DATA',
+          createdAt: '2026-11-27T10:05:00.000Z',
+        },
+      ],
+    };
+
+    const poll$ = new Subject<Sale>();
+    const fixture = setup({
+      saleId: 'sale-pending-1',
+      getSale$: of(pendingPixSale),
+    });
+    pollSaleUntilSettledSpy.mockReturnValue(poll$.asObservable());
+
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+
+    expect(getSaleSpy).toHaveBeenCalledWith('sale-pending-1');
+    expect(payWithPixSpy).not.toHaveBeenCalled();
+    expect(pollSaleUntilSettledSpy).toHaveBeenCalledWith('sale-pending-1');
+    expect(el.textContent).toContain('Venda #77');
+    expect(el.querySelector('[data-testid="sale-status-badge"]')?.textContent).toContain(
+      'Pendente — aguardando pagamento',
+    );
+    expect(el.textContent).toContain('00020126330014br.gov.bcb.pix-retomado');
+    const qrImg = el.querySelector<HTMLImageElement>('img[alt="QR Code PIX"]');
+    expect(qrImg?.getAttribute('src')).toBe('data:image/png;base64,RETOMADO_BASE64_DATA');
+
+    // Polling confirma venda como COMPLETED
+    poll$.next({
+      ...pendingPixSale,
+      status: 'COMPLETED',
+      completedAt: '2026-11-27T10:07:00.000Z',
+      payments: [
+        {
+          ...pendingPixSale.payments![1],
+          status: 'APPROVED',
+        },
+      ],
+    });
+    fixture.detectChanges();
+
+    expect(el.querySelector('[data-testid="sale-status-badge"]')?.textContent).toContain(
+      'Concluída',
+    );
+    expect(el.querySelector('[data-testid="completed-payment-method"]')?.textContent).toContain(
+      'PIX',
+    );
+  });
+
+  it('US11 CA5: ao iniciar com ?saleId=<id> de venda já em OPEN, abre diretamente na tela de pagamento com as formas liberadas sem polling', async () => {
+    const reopenedSale: Sale = {
+      ...openSale,
+      id: 'sale-open-99',
+      number: 99,
+      status: 'OPEN',
+      payments: [
+        {
+          id: 'pay-abandoned',
+          saleId: 'sale-open-99',
+          method: 'PIX',
+          status: 'ABANDONED',
+          amountCents: 2500,
+          gatewayPaymentId: 'mp-old',
+          qrCode: '000201-old',
+          qrCodeBase64: 'OLD_BASE64',
+          createdAt: '2026-11-27T10:00:00.000Z',
+        },
+      ],
+    };
+
+    const fixture = setup({
+      saleId: 'sale-open-99',
+      getSale$: of(reopenedSale),
+    });
+
+    fixture.detectChanges();
+    await flushMicrotasks();
+    fixture.detectChanges();
+
+    const el = fixture.nativeElement as HTMLElement;
+
+    expect(getSaleSpy).toHaveBeenCalledWith('sale-open-99');
+    expect(pollSaleUntilSettledSpy).not.toHaveBeenCalled();
+    expect(el.textContent).toContain('Venda #99');
+    expect(el.querySelector('[data-testid="sale-status-badge"]')?.textContent).toContain(
+      'Venda aberta',
+    );
+    expect(el.querySelector('[data-testid="select-method-card"]')).not.toBeNull();
+    expect(el.querySelector('[data-testid="select-method-pix"]')).not.toBeNull();
+    expect(el.querySelector('[data-testid="select-method-customer-credit"]')).not.toBeNull();
+    expect(el.querySelector('[data-testid="select-method-external-credit"]')).not.toBeNull();
+    expect(el.querySelector('[data-testid="select-method-external-debit"]')).not.toBeNull();
+  });
+
+  it('US11 CA5: em PIX PENDING, botão Trocar forma de pagamento exige confirmação explícita (Voltar/Esc não reabre), chama reopenSale ao confirmar, encerra polling e libera formas em OPEN', async () => {
+    const pendingPixSale: Sale = {
+      ...openSale,
+      id: 'sale-pix-55',
+      number: 55,
+      status: 'PENDING',
+      payments: [
+        {
+          id: 'pay-pix-55',
+          saleId: 'sale-pix-55',
+          method: 'PIX',
+          status: 'PENDING',
+          amountCents: 2500,
+          gatewayPaymentId: 'mp-pix-55',
+          qrCode: '000201-pix-55',
+          qrCodeBase64: 'PIX55_BASE64',
+          createdAt: '2026-11-27T10:10:00.000Z',
+        },
+      ],
+    };
+
+    let pollingUnsubscribed = false;
+    const poll$ = new Observable<Sale>(() => {
+      return () => {
+        pollingUnsubscribed = true;
+      };
+    });
+
+    const fixture = setup({
+      saleId: 'sale-pix-55',
+      getSale$: of(pendingPixSale),
+    });
+    pollSaleUntilSettledSpy.mockReturnValue(poll$);
+    reopenSaleSpy.mockReturnValue(
+      of({
+        ...pendingPixSale,
+        status: 'OPEN',
+        payments: [{ ...pendingPixSale.payments![0], status: 'ABANDONED' }],
+      }),
+    );
+
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+
+    const reopenBtn = el.querySelector<HTMLButtonElement>('[data-testid="reopen-sale-btn"]');
+    expect(reopenBtn).not.toBeNull();
+    expect(reopenBtn?.textContent).toContain('Trocar forma de pagamento');
+
+    // Abre confirmação e desiste com Voltar
+    reopenBtn!.click();
+    fixture.detectChanges();
+    expect(el.querySelector('[data-testid="reopen-confirm-modal"]')).not.toBeNull();
+    expect(reopenSaleSpy).not.toHaveBeenCalled();
+
+    el.querySelector<HTMLButtonElement>('[data-testid="dismiss-reopen-btn"]')!.click();
+    fixture.detectChanges();
+    expect(el.querySelector('[data-testid="reopen-confirm-modal"]')).toBeNull();
+    expect(reopenSaleSpy).not.toHaveBeenCalled();
+
+    // Abre novamente e desiste com Escape
+    reopenBtn!.click();
+    fixture.detectChanges();
+    expect(el.querySelector('[data-testid="reopen-confirm-modal"]')).not.toBeNull();
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    fixture.detectChanges();
+    expect(el.querySelector('[data-testid="reopen-confirm-modal"]')).toBeNull();
+    expect(reopenSaleSpy).not.toHaveBeenCalled();
+    expect(pollingUnsubscribed).toBe(false);
+
+    // Abre e confirma troca
+    reopenBtn!.click();
+    fixture.detectChanges();
+    el.querySelector<HTMLButtonElement>('[data-testid="confirm-reopen-btn"]')!.click();
+    fixture.detectChanges();
+    await flushMicrotasks();
+    fixture.detectChanges();
+
+    expect(reopenSaleSpy).toHaveBeenCalledWith('sale-pix-55');
+    expect(pollingUnsubscribed).toBe(true);
+    expect(el.querySelector('[data-testid="reopen-confirm-modal"]')).toBeNull();
+    expect(el.querySelector('[data-testid="sale-status-badge"]')?.textContent).toContain(
+      'Venda aberta',
+    );
+    expect(el.querySelector('[data-testid="select-method-card"]')).not.toBeNull();
+    expect(el.querySelector('[data-testid="select-method-pix"]')).not.toBeNull();
+    expect(el.querySelector('[data-testid="select-method-customer-credit"]')).not.toBeNull();
+    expect(el.querySelector('[data-testid="select-method-external-credit"]')).not.toBeNull();
+    expect(el.querySelector('[data-testid="select-method-external-debit"]')).not.toBeNull();
+  });
+
+  it('US11 CA7: durante envio de Trocar forma de pagamento desabilita botões e bloqueia Esc/duplo clique; erro de rede mantém venda PENDING e permite retentar', async () => {
+    const pendingPixSale: Sale = {
+      ...openSale,
+      id: 'sale-pix-err',
+      number: 56,
+      status: 'PENDING',
+      payments: [
+        {
+          id: 'pay-pix-56',
+          saleId: 'sale-pix-err',
+          method: 'PIX',
+          status: 'PENDING',
+          amountCents: 2500,
+          gatewayPaymentId: 'mp-pix-56',
+          qrCode: '000201-pix-56',
+          qrCodeBase64: 'PIX56_BASE64',
+          createdAt: '2026-11-27T10:15:00.000Z',
+        },
+      ],
+    };
+
+    const reopen$ = new Subject<Sale>();
+    const fixture = setup({
+      saleId: 'sale-pix-err',
+      getSale$: of(pendingPixSale),
+    });
+    reopenSaleSpy.mockReturnValue(reopen$.asObservable());
+
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+
+    el.querySelector<HTMLButtonElement>('[data-testid="reopen-sale-btn"]')!.click();
+    fixture.detectChanges();
+
+    const confirmBtn = el.querySelector<HTMLButtonElement>('[data-testid="confirm-reopen-btn"]')!;
+    const dismissBtn = el.querySelector<HTMLButtonElement>('[data-testid="dismiss-reopen-btn"]')!;
+
+    confirmBtn.click();
+    fixture.detectChanges();
+
+    expect(confirmBtn.disabled).toBe(true);
+    expect(dismissBtn.disabled).toBe(true);
+    // Duplo clique e Escape bloqueados durante carregamento
+    confirmBtn.click();
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    fixture.detectChanges();
+    expect(reopenSaleSpy).toHaveBeenCalledTimes(1);
+    expect(el.querySelector('[data-testid="reopen-confirm-modal"]')).not.toBeNull();
+
+    // Erro de rede mantém PENDING e exibe alerta
+    reopen$.error(new HttpErrorResponse({ status: 0, statusText: 'Unknown Error' }));
+    fixture.detectChanges();
+
+    expect(el.querySelector('[data-testid="sale-status-badge"]')?.textContent).toContain(
+      'Pendente — aguardando pagamento',
+    );
+    expect(el.textContent).toContain('000201-pix-56');
+    const errorEl = el.querySelector('[data-testid="reopen-sale-error"]');
+    expect(errorEl).not.toBeNull();
+    expect(errorEl?.getAttribute('role')).toBe('alert');
+    expect(errorEl?.textContent).toContain('Não foi possível conectar. Tente novamente.');
+    expect(confirmBtn.disabled).toBe(false);
+    expect(dismissBtn.disabled).toBe(false);
+
+    // Nova tentativa após erro consegue reabrir
+    reopenSaleSpy.mockReturnValueOnce(
+      of({
+        ...pendingPixSale,
+        status: 'OPEN',
+        payments: [{ ...pendingPixSale.payments![0], status: 'ABANDONED' }],
+      }),
+    );
+    confirmBtn.click();
+    fixture.detectChanges();
+    await flushMicrotasks();
+    fixture.detectChanges();
+
+    expect(reopenSaleSpy).toHaveBeenCalledTimes(2);
+    expect(el.querySelector('[data-testid="sale-status-badge"]')?.textContent).toContain(
+      'Venda aberta',
+    );
+  });
+
+  it('US11 CA7: falha de rede ao carregar venda via ?saleId= exibe erro claro e permite tentar novamente', () => {
+    const pendingPixSale: Sale = {
+      ...openSale,
+      id: 'sale-retry-1',
+      number: 88,
+      status: 'PENDING',
+      payments: [
+        {
+          id: 'pay-pix-88',
+          saleId: 'sale-retry-1',
+          method: 'PIX',
+          status: 'PENDING',
+          amountCents: 2500,
+          gatewayPaymentId: 'mp-pix-88',
+          qrCode: '000201-pix-88',
+          qrCodeBase64: 'PIX88_BASE64',
+          createdAt: '2026-11-27T10:20:00.000Z',
+        },
+      ],
+    };
+
+    const load$ = new Subject<Sale>();
+    const fixture = setup({
+      saleId: 'sale-retry-1',
+      getSale$: load$.asObservable(),
+    });
+
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+
+    expect(getSaleSpy).toHaveBeenCalledWith('sale-retry-1');
+    expect(el.textContent).toContain('Carregando venda...');
+
+    load$.error(new HttpErrorResponse({ status: 0, statusText: 'Unknown Error' }));
+    fixture.detectChanges();
+
+    const errorEl = el.querySelector('[data-testid="load-sale-error"]');
+    expect(errorEl).not.toBeNull();
+    expect(errorEl?.getAttribute('role')).toBe('alert');
+    expect(errorEl?.textContent).toContain('Não foi possível conectar. Tente novamente.');
+
+    // Tentar novamente carrega a venda com sucesso
+    getSaleSpy.mockReturnValueOnce(of(pendingPixSale));
+    el.querySelector<HTMLButtonElement>('[data-testid="retry-load-sale-btn"]')!.click();
+    fixture.detectChanges();
+
+    expect(getSaleSpy).toHaveBeenCalledTimes(2);
+    expect(el.querySelector('[data-testid="load-sale-error"]')).toBeNull();
+    expect(el.textContent).toContain('Venda #88');
+    expect(el.textContent).toContain('000201-pix-88');
+    expect(pollSaleUntilSettledSpy).toHaveBeenCalledWith('sale-retry-1');
   });
 });

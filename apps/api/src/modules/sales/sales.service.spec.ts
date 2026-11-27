@@ -18,6 +18,7 @@ describe('SalesService', () => {
     };
     sale: {
       create: ReturnType<typeof vi.fn>;
+      findMany: ReturnType<typeof vi.fn>;
       findUnique: ReturnType<typeof vi.fn>;
       findUniqueOrThrow: ReturnType<typeof vi.fn>;
       updateMany: ReturnType<typeof vi.fn>;
@@ -39,6 +40,7 @@ describe('SalesService', () => {
       },
       sale: {
         create: vi.fn(),
+        findMany: vi.fn(),
         findUnique: vi.fn(),
         findUniqueOrThrow: vi.fn(),
         updateMany: vi.fn(),
@@ -586,6 +588,188 @@ describe('SalesService', () => {
       expect(error).toBeInstanceOf(UnprocessableEntityException);
       expect((error as UnprocessableEntityException).message).toBe(
         'A venda já está cancelada.',
+      );
+      expect(prisma.payment.updateMany).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('findAllForOperator', () => {
+    it('filtra por operatorId e status quando informado, ordenado por createdAt desc com detalhes', async () => {
+      const pendingSales = [
+        {
+          id: 'sale-pending-2',
+          number: 20,
+          operatorId: 'op-1',
+          status: SaleStatus.PENDING,
+          totalCents: 2500,
+          createdAt: new Date('2026-11-27T15:00:00.000Z'),
+          items: [],
+          payments: [{ id: 'pay-2', status: PaymentStatus.PENDING }],
+          customer: { id: 'cust-1', name: 'Maria Silva' },
+        },
+      ];
+      prisma.sale.findMany.mockResolvedValue(pendingSales);
+
+      const result = await service.findAllForOperator(
+        'op-1',
+        SaleStatus.PENDING,
+      );
+
+      expect(prisma.sale.findMany).toHaveBeenCalledWith({
+        where: {
+          operatorId: 'op-1',
+          status: SaleStatus.PENDING,
+        },
+        orderBy: { createdAt: 'desc' },
+        include: {
+          items: { include: { product: true } },
+          payments: { orderBy: { createdAt: 'asc' } },
+          customer: true,
+        },
+      });
+      expect(result).toEqual(pendingSales);
+    });
+
+    it('filtra apenas por operatorId quando status não é informado e retorna lista vazia', async () => {
+      prisma.sale.findMany.mockResolvedValue([]);
+
+      const result = await service.findAllForOperator('op-1');
+
+      expect(prisma.sale.findMany).toHaveBeenCalledWith({
+        where: {
+          operatorId: 'op-1',
+        },
+        orderBy: { createdAt: 'desc' },
+        include: {
+          items: { include: { product: true } },
+          payments: { orderBy: { createdAt: 'asc' } },
+          customer: true,
+        },
+      });
+      expect(result).toEqual([]);
+    });
+  });
+
+  describe('reopen', () => {
+    it('reabre venda PENDING do operador em transação atômica, marcando Payment PENDING como ABANDONED', async () => {
+      prisma.sale.findUnique.mockResolvedValue({
+        id: 'sale-pending-1',
+        operatorId: 'op-1',
+        status: SaleStatus.PENDING,
+        completedAt: null,
+      });
+      prisma.sale.updateMany.mockResolvedValue({ count: 1 });
+      prisma.payment.updateMany.mockResolvedValue({ count: 1 });
+      const reopenedSale = {
+        id: 'sale-pending-1',
+        number: 15,
+        operatorId: 'op-1',
+        status: SaleStatus.OPEN,
+        totalCents: 3500,
+        completedAt: null,
+        items: [],
+        payments: [
+          {
+            id: 'pay-1',
+            saleId: 'sale-pending-1',
+            status: PaymentStatus.ABANDONED,
+          },
+        ],
+        customer: null,
+      };
+      prisma.sale.findUniqueOrThrow.mockResolvedValue(reopenedSale);
+
+      const result = await service.reopen('sale-pending-1', 'op-1');
+
+      expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+      expect(prisma.sale.updateMany).toHaveBeenCalledWith({
+        where: {
+          id: 'sale-pending-1',
+          status: SaleStatus.PENDING,
+        },
+        data: { status: SaleStatus.OPEN },
+      });
+      expect(prisma.payment.updateMany).toHaveBeenCalledWith({
+        where: {
+          saleId: 'sale-pending-1',
+          status: PaymentStatus.PENDING,
+        },
+        data: { status: PaymentStatus.ABANDONED },
+      });
+      expect(prisma.sale.findUniqueOrThrow).toHaveBeenCalledWith({
+        where: { id: 'sale-pending-1' },
+        include: {
+          items: { include: { product: true } },
+          payments: { orderBy: { createdAt: 'asc' } },
+          customer: true,
+        },
+      });
+      expect(result).toEqual(reopenedSale);
+    });
+
+    it('rejeita com NotFoundException quando a venda não existe', async () => {
+      prisma.sale.findUnique.mockResolvedValue(null);
+
+      const error = await service
+        .reopen('sale-inexistente', 'op-1')
+        .catch((e) => e);
+
+      expect(error).toBeInstanceOf(NotFoundException);
+      expect((error as NotFoundException).message).toBe(
+        'Venda não encontrada.',
+      );
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
+
+    it('rejeita com ForbiddenException quando outro operador tenta reabrir a venda', async () => {
+      prisma.sale.findUnique.mockResolvedValue({
+        id: 'sale-pending-1',
+        operatorId: 'op-1',
+        status: SaleStatus.PENDING,
+      });
+
+      const error = await service
+        .reopen('sale-pending-1', 'op-2')
+        .catch((e) => e);
+
+      expect(error).toBeInstanceOf(ForbiddenException);
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
+
+    it.each([SaleStatus.OPEN, SaleStatus.COMPLETED, SaleStatus.CANCELED])(
+      'rejeita com UnprocessableEntityException quando a venda está em estado %s',
+      async (status) => {
+        prisma.sale.findUnique.mockResolvedValue({
+          id: `sale-${status.toLowerCase()}`,
+          operatorId: 'op-1',
+          status,
+        });
+
+        const error = await service
+          .reopen(`sale-${status.toLowerCase()}`, 'op-1')
+          .catch((e) => e);
+
+        expect(error).toBeInstanceOf(UnprocessableEntityException);
+        expect((error as UnprocessableEntityException).message).toBe(
+          'A venda não está pendente para reabertura.',
+        );
+        expect(prisma.$transaction).not.toHaveBeenCalled();
+      },
+    );
+
+    it('em corrida (updateMany.count === 0), lança 422 sem abandonar pagamentos', async () => {
+      prisma.sale.findUnique.mockResolvedValue({
+        id: 'sale-race',
+        operatorId: 'op-1',
+        status: SaleStatus.PENDING,
+      });
+      prisma.sale.updateMany.mockResolvedValue({ count: 0 });
+
+      const error = await service.reopen('sale-race', 'op-1').catch((e) => e);
+
+      expect(error).toBeInstanceOf(UnprocessableEntityException);
+      expect((error as UnprocessableEntityException).message).toBe(
+        'A venda não está pendente para reabertura.',
       );
       expect(prisma.payment.updateMany).not.toHaveBeenCalled();
     });

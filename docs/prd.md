@@ -193,7 +193,7 @@ Essas relações representam o núcleo do domínio sem definir banco, endpoints 
 
 **Regras relacionadas:** RN13
 
-### US11 — Retomar ou cancelar venda pendente · `Must Have` · `M` · Status: `🟡 Ready`
+### US11 — Retomar ou cancelar venda pendente · `Must Have` · `M` · Status: `🟢 Live`
 
 **Como** operador de caixa, **eu quero** consultar as vendas PIX pendentes e retomá-las ou cancelá-las **para que** uma venda abandonada no pagamento não fique esquecida nem seja tratada como paga.
 

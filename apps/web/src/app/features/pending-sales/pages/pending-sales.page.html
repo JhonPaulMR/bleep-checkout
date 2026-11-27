@@ -1,0 +1,255 @@
+<main class="min-h-screen bg-fundo">
+  <div class="mx-auto max-w-5xl px-lg py-xl">
+    <header class="mb-lg flex flex-col gap-md sm:flex-row sm:items-center sm:justify-between">
+      <div>
+        <h1 class="text-titulo-pagina text-texto">Vendas pendentes</h1>
+        <p class="mt-xs text-corpo text-texto-suave">
+          Acompanhe vendas PIX aguardando confirmação para retomar, trocar a forma de pagamento ou
+          cancelar
+        </p>
+      </div>
+
+      <a
+        routerLink="/caixa"
+        class="inline-flex items-center justify-center gap-xs rounded-xl border border-primaria px-lg py-sm text-corpo-destaque text-primaria transition-colors hover:bg-superficie focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primaria"
+      >
+        <span class="material-symbols-outlined text-[20px]" aria-hidden="true">point_of_sale</span>
+        <span>Voltar ao caixa</span>
+      </a>
+    </header>
+
+    <section aria-label="Lista de vendas pendentes">
+      @if (loading()) {
+        <div
+          class="rounded-2xl border border-desabilitado/60 bg-superficie p-xl text-center shadow-sm"
+        >
+          <p class="text-corpo text-texto-suave">Carregando vendas pendentes...</p>
+        </div>
+      } @else if (listError(); as message) {
+        <div
+          class="flex flex-col items-center gap-md rounded-2xl border border-perigo/60 bg-superficie p-xl text-center shadow-sm"
+        >
+          <p role="alert" class="text-corpo-destaque text-perigo">{{ message }}</p>
+          <button
+            type="button"
+            data-testid="retry-load-btn"
+            (click)="loadPendingSales()"
+            class="rounded-md bg-primaria px-md py-sm text-corpo-destaque text-superficie transition-colors hover:brightness-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primaria"
+          >
+            Tentar novamente
+          </button>
+        </div>
+      } @else if (sales().length === 0) {
+        <div
+          data-testid="empty-pending-sales"
+          class="flex flex-col items-center gap-md rounded-2xl border border-desabilitado/60 bg-superficie p-xl text-center shadow-sm"
+        >
+          <div
+            class="flex h-14 w-14 items-center justify-center rounded-2xl bg-primaria/10 text-primaria"
+          >
+            <span class="material-symbols-outlined text-[28px]" aria-hidden="true">
+              check_circle
+            </span>
+          </div>
+          <div>
+            <h2 class="text-titulo-secao text-texto">Não há vendas pendentes</h2>
+            <p class="mt-xs text-corpo text-texto-suave">
+              Todas as suas vendas estão finalizadas ou canceladas no momento.
+            </p>
+          </div>
+          <a
+            routerLink="/caixa"
+            data-testid="back-to-checkout-link"
+            class="inline-flex items-center justify-center gap-xs rounded-md bg-primaria px-lg py-sm text-corpo-destaque text-superficie transition-colors hover:brightness-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primaria"
+          >
+            Voltar ao caixa
+          </a>
+        </div>
+      } @else {
+        <ul class="flex flex-col gap-md">
+          @for (sale of sales(); track sale.id) {
+            <li
+              data-testid="pending-sale-card"
+              class="flex flex-col gap-md rounded-2xl border border-desabilitado/60 bg-superficie p-lg shadow-sm sm:flex-row sm:items-center sm:justify-between"
+            >
+              <div class="flex flex-col gap-xs">
+                <div class="flex flex-wrap items-center gap-sm">
+                  <span class="text-titulo-secao text-texto">Venda #{{ sale.number }}</span>
+                  <span
+                    class="inline-flex items-center gap-xs rounded-full bg-alerta/10 px-sm py-xs text-legenda font-semibold text-alerta"
+                  >
+                    <span class="material-symbols-outlined text-[16px]" aria-hidden="true">
+                      schedule
+                    </span>
+                    <span>Pendente — aguardando pagamento</span>
+                  </span>
+                </div>
+
+                <div class="flex flex-wrap items-center gap-x-lg gap-y-xs text-corpo text-texto-suave">
+                  <span class="text-corpo-destaque text-texto">
+                    {{ formatCents(sale.totalCents) }}
+                  </span>
+                  <span data-testid="pending-sale-datetime">{{ formatDateTime(sale.createdAt) }}</span>
+                  @if (sale.customer; as customer) {
+                    <span data-testid="pending-sale-customer">Cliente: {{ customer.name }}</span>
+                  }
+                </div>
+              </div>
+
+              <div class="flex flex-wrap items-center gap-sm">
+                <button
+                  type="button"
+                  data-testid="resume-sale-btn"
+                  [disabled]="isSaleBusy(sale.id)"
+                  (click)="resumeSale(sale)"
+                  class="rounded-md bg-primaria px-md py-sm text-corpo-destaque text-superficie transition-colors hover:brightness-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primaria disabled:bg-desabilitado disabled:text-texto-suave"
+                >
+                  Retomar
+                </button>
+
+                <button
+                  type="button"
+                  data-testid="reopen-sale-btn"
+                  [disabled]="isSaleBusy(sale.id)"
+                  (click)="openReopenConfirm(sale)"
+                  class="rounded-md border border-primaria px-md py-sm text-corpo-destaque text-primaria transition-colors hover:bg-fundo focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primaria disabled:border-desabilitado disabled:text-desabilitado"
+                >
+                  Trocar forma
+                </button>
+
+                <button
+                  type="button"
+                  data-testid="cancel-sale-btn"
+                  [disabled]="isSaleBusy(sale.id)"
+                  (click)="openCancelConfirm(sale)"
+                  class="rounded-md bg-perigo px-md py-sm text-corpo-destaque text-superficie transition-colors hover:brightness-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-perigo disabled:bg-desabilitado disabled:text-texto-suave"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </li>
+          }
+        </ul>
+      }
+    </section>
+  </div>
+
+  @if (reopenTarget(); as target) {
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="reopen-pending-modal-title"
+      data-testid="reopen-confirm-modal"
+      class="fixed inset-0 z-50 flex items-center justify-center bg-texto/40 p-md backdrop-blur-sm"
+      (click)="onReopenModalBackdropClick($event)"
+      (keydown.escape)="closeReopenConfirm()"
+    >
+      <div
+        class="flex w-full max-w-md flex-col gap-md rounded-2xl border border-desabilitado bg-superficie p-lg shadow-xl"
+      >
+        <div class="flex items-start gap-sm border-b border-desabilitado pb-md">
+          <span class="material-symbols-outlined text-primaria" aria-hidden="true">swap_horiz</span>
+          <div>
+            <h2 id="reopen-pending-modal-title" class="text-titulo-secao text-texto">
+              Trocar forma de pagamento da venda #{{ target.number }}?
+            </h2>
+            <p class="mt-xs text-corpo text-texto-suave">
+              A cobrança PIX pendente será abandonada e a venda voltará ao caixa para escolher outra
+              forma de pagamento.
+            </p>
+          </div>
+        </div>
+
+        @if (reopenError(); as message) {
+          <p role="alert" data-testid="reopen-sale-error" class="text-corpo text-perigo">
+            {{ message }}
+          </p>
+        }
+
+        <div class="flex flex-wrap justify-end gap-sm pt-xs">
+          <button
+            type="button"
+            data-testid="dismiss-reopen-btn"
+            [disabled]="reopeningSale()"
+            (click)="closeReopenConfirm()"
+            class="rounded-md border border-desabilitado px-md py-sm text-corpo-destaque text-texto transition-colors hover:bg-fundo focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primaria disabled:text-desabilitado"
+          >
+            Voltar
+          </button>
+          <button
+            type="button"
+            data-testid="confirm-reopen-btn"
+            [disabled]="reopeningSale()"
+            (click)="confirmReopen()"
+            class="rounded-md bg-primaria px-md py-sm text-corpo-destaque text-superficie transition-colors hover:brightness-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primaria disabled:bg-desabilitado disabled:text-texto-suave"
+          >
+            @if (reopeningSale()) {
+              Reabrindo...
+            } @else {
+              Confirmar troca
+            }
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+
+  @if (cancelTarget(); as target) {
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="cancel-pending-modal-title"
+      data-testid="cancel-confirm-modal"
+      class="fixed inset-0 z-50 flex items-center justify-center bg-texto/40 p-md backdrop-blur-sm"
+      (click)="onCancelModalBackdropClick($event)"
+      (keydown.escape)="closeCancelConfirm()"
+    >
+      <div
+        class="flex w-full max-w-md flex-col gap-md rounded-2xl border border-desabilitado bg-superficie p-lg shadow-xl"
+      >
+        <div class="flex items-start gap-sm border-b border-desabilitado pb-md">
+          <span class="material-symbols-outlined text-perigo" aria-hidden="true">cancel</span>
+          <div>
+            <h2 id="cancel-pending-modal-title" class="text-titulo-secao text-texto">
+              Cancelar venda #{{ target.number }}?
+            </h2>
+            <p class="mt-xs text-corpo text-texto-suave">
+              Nenhum valor será recebido e o pagamento PIX pendente será abandonado.
+            </p>
+          </div>
+        </div>
+
+        @if (cancelError(); as message) {
+          <p role="alert" data-testid="cancel-sale-error" class="text-corpo text-perigo">
+            {{ message }}
+          </p>
+        }
+
+        <div class="flex flex-wrap justify-end gap-sm pt-xs">
+          <button
+            type="button"
+            data-testid="dismiss-cancel-btn"
+            [disabled]="cancelingSale()"
+            (click)="closeCancelConfirm()"
+            class="rounded-md border border-desabilitado px-md py-sm text-corpo-destaque text-texto transition-colors hover:bg-fundo focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primaria disabled:text-desabilitado"
+          >
+            Voltar
+          </button>
+          <button
+            type="button"
+            data-testid="confirm-cancel-btn"
+            [disabled]="cancelingSale()"
+            (click)="confirmCancel()"
+            class="rounded-md bg-perigo px-md py-sm text-corpo-destaque text-superficie transition-colors hover:brightness-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-perigo disabled:bg-desabilitado disabled:text-texto-suave"
+          >
+            @if (cancelingSale()) {
+              Cancelando...
+            } @else {
+              Confirmar cancelamento
+            }
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+</main>
