@@ -9,3 +9,4 @@ Estas preferências complementam `.agents/rules/utf-rules.md` (sem revogar os po
    - `Closes #<n>` preenchido;
    - na seção **"O que este PR faz e por quê"**, uma lista visível (fora de comentários HTML) de tópicos objetivos cobrindo **todas** as mudanças do PR (spec/plano, backend, frontend, testes, docs e eventuais arquivos auxiliares) para orientar o usuário a redigir a explicação completa com as próprias palavras (≥ 250 caracteres);
    - seção **"Apontamentos da revisão"** preenchida com os apontamentos aceitos e recusados (com justificativa) a partir de `specs/<NNN>-<slug>/reviews/tarefa-NN-decisoes-rN.md`.
+4. **Orquestração com Swarm:** prefira usar o plugin/ferramenta **`swarm`** para orquestrar os agentes (implementação, revisões em paralelo e auditoria final), mantendo o isolamento entre quem implementa e quem revisa exigido por `.agents/rules/utf-rules.md`.
