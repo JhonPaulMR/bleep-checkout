@@ -16,6 +16,7 @@ import { AuthService } from '../../../core/auth/auth.service';
 import {
   CheckoutCustomer,
   CheckoutService,
+  ExternalPaymentMethod,
   Payment,
   PayWithCardPayload,
   Product,
@@ -26,10 +27,17 @@ const NETWORK_ERROR_MESSAGE = 'Não foi possível conectar. Tente novamente.';
 const INVALID_QUANTITY_MESSAGE = 'Informe uma quantidade inteira positiva.';
 const CARD_DECLINED_MESSAGE =
   'Pagamento recusado. Tente outro cartão ou escolha outra forma de pagamento.';
+const EXTERNAL_DECLINED_MESSAGE =
+  'Pagamento externo não aprovado na máquina. Tente novamente ou escolha outra forma de pagamento.';
 const DEFAULT_PAYER_EMAIL = 'operador@bleep.local';
 const CARD_BRICK_CONTAINER_ID = 'card-payment-brick-container';
 
-type CheckoutPaymentMethod = 'CARD' | 'PIX' | 'CUSTOMER_CREDIT';
+type CheckoutPaymentMethod =
+  | 'CARD'
+  | 'PIX'
+  | 'CUSTOMER_CREDIT'
+  | 'EXTERNAL_CREDIT'
+  | 'EXTERNAL_DEBIT';
 
 interface CartItem {
   product: Product;
@@ -185,6 +193,28 @@ export class CheckoutPage {
     const currentSale = this.sale();
     const payment = this.lastPayment();
     return currentSale?.status === 'PENDING' && payment?.method !== 'PIX';
+  });
+
+  protected readonly selectedExternalMethod = computed<ExternalPaymentMethod | null>(() => {
+    const method = this.selectedMethod();
+    return method === 'EXTERNAL_CREDIT' || method === 'EXTERNAL_DEBIT' ? method : null;
+  });
+
+  protected readonly selectedExternalMethodLabel = computed(() =>
+    this.selectedExternalMethod() === 'EXTERNAL_DEBIT' ? 'Débito externo' : 'Crédito externo',
+  );
+
+  protected readonly completedExternalMethodLabel = computed<string | null>(() => {
+    const method = this.lastPayment()?.method;
+    if (method === 'EXTERNAL_CREDIT') return 'Crédito externo';
+    if (method === 'EXTERNAL_DEBIT') return 'Débito externo';
+    return null;
+  });
+
+  protected readonly isCardDeclined = computed(() => {
+    if (this.declinedMessage() === null) return false;
+    const method = this.lastPayment()?.method;
+    return method !== 'EXTERNAL_CREDIT' && method !== 'EXTERNAL_DEBIT';
   });
 
   constructor() {
@@ -473,6 +503,7 @@ export class CheckoutPage {
 
     this.selectedMethod.set(method);
     this.paymentError.set(null);
+    this.declinedMessage.set(null);
 
     if (method === 'CARD') {
       this.initializeCardBrick(currentSale);
@@ -551,6 +582,35 @@ export class CheckoutPage {
             ...result.sale.customer,
             balanceCents: result.customerBalanceCents,
           });
+        }
+      },
+      error: (err: unknown) => {
+        this.submittingPayment.set(false);
+        if (err instanceof HttpErrorResponse && err.status === 401) return;
+        this.paymentError.set(this.extractErrorMessage(err));
+      },
+    });
+  }
+
+  protected submitExternalPayment(approved: boolean): void {
+    const currentSale = this.sale();
+    const method = this.selectedExternalMethod();
+    if (!currentSale || currentSale.status !== 'OPEN' || !method || this.submittingPayment()) {
+      return;
+    }
+
+    this.paymentError.set(null);
+    this.declinedMessage.set(null);
+    this.submittingPayment.set(true);
+
+    this.checkoutService.payExternal(currentSale.id, { method, approved }).subscribe({
+      next: (response) => {
+        this.submittingPayment.set(false);
+        this.sale.set(response.sale);
+        this.lastPayment.set(response.payment);
+
+        if (response.payment.status === 'DECLINED' && response.sale.status === 'OPEN') {
+          this.declinedMessage.set(EXTERNAL_DECLINED_MESSAGE);
         }
       },
       error: (err: unknown) => {

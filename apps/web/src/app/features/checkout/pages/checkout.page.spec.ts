@@ -41,6 +41,7 @@ describe('CheckoutPage', () => {
   let payWithCardSpy: ReturnType<typeof vi.fn>;
   let payWithPixSpy: ReturnType<typeof vi.fn>;
   let payWithCustomerCreditSpy: ReturnType<typeof vi.fn>;
+  let payExternalSpy: ReturnType<typeof vi.fn>;
 
   let brickCreateSpy: ReturnType<typeof vi.fn>;
   let brickUnmountSpy: ReturnType<typeof vi.fn<() => void>>;
@@ -149,6 +150,7 @@ describe('CheckoutPage', () => {
     payWithCardSpy = vi.fn();
     payWithPixSpy = vi.fn();
     payWithCustomerCreditSpy = vi.fn();
+    payExternalSpy = vi.fn();
 
     TestBed.configureTestingModule({
       imports: [CheckoutPage],
@@ -165,6 +167,7 @@ describe('CheckoutPage', () => {
             payWithCard: payWithCardSpy,
             payWithPix: payWithPixSpy,
             payWithCustomerCredit: payWithCustomerCreditSpy,
+            payExternal: payExternalSpy,
           },
         },
       ],
@@ -1575,5 +1578,271 @@ describe('CheckoutPage', () => {
 
     controller.verify();
     sessionStorage.clear();
+  });
+
+  it('US07 CA3: selecionar Crédito externo ou Débito externo não aprova automaticamente e exige confirmação explícita', async () => {
+    const fixture = setup();
+    const el = await addFirstProductAndProceed(fixture);
+
+    const externalCreditTab = el.querySelector<HTMLButtonElement>(
+      '[data-testid="select-method-external-credit"]',
+    )!;
+    const externalDebitTab = el.querySelector<HTMLButtonElement>(
+      '[data-testid="select-method-external-debit"]',
+    )!;
+
+    expect(externalCreditTab).not.toBeNull();
+    expect(externalDebitTab).not.toBeNull();
+
+    externalCreditTab.click();
+    fixture.detectChanges();
+
+    expect(payExternalSpy).not.toHaveBeenCalled();
+    expect(el.querySelector('[data-testid="sale-status-badge"]')?.textContent).toContain(
+      'Venda aberta',
+    );
+    expect(el.textContent).not.toContain('Venda concluída');
+    expect(el.querySelector('[data-testid="external-approve-btn"]')?.textContent).toContain(
+      'Aprovado na máquina',
+    );
+    expect(el.querySelector('[data-testid="external-decline-btn"]')?.textContent).toContain(
+      'Não aprovado na máquina',
+    );
+
+    externalDebitTab.click();
+    fixture.detectChanges();
+
+    expect(payExternalSpy).not.toHaveBeenCalled();
+    expect(el.querySelector('[data-testid="sale-status-badge"]')?.textContent).toContain(
+      'Venda aberta',
+    );
+    expect(el.textContent).not.toContain('Venda concluída');
+  });
+
+  it('US07 CA1: clicar em Aprovado na máquina para Crédito externo conclui a venda exibindo Crédito externo', async () => {
+    const fixture = setup();
+    const approvedResponse: PaymentResponse = {
+      payment: {
+        id: 'pay-ext-credit-1',
+        saleId: 'sale-1',
+        method: 'EXTERNAL_CREDIT',
+        status: 'APPROVED',
+        amountCents: 2500,
+        gatewayPaymentId: null,
+        qrCode: null,
+        qrCodeBase64: null,
+        createdAt: '2026-11-27T15:00:00.000Z',
+      },
+      sale: {
+        ...openSale,
+        status: 'COMPLETED',
+        completedAt: '2026-11-27T15:00:01.000Z',
+      },
+    };
+    payExternalSpy.mockReturnValue(of(approvedResponse));
+
+    const el = await addFirstProductAndProceed(fixture);
+
+    el.querySelector<HTMLButtonElement>('[data-testid="select-method-external-credit"]')!.click();
+    fixture.detectChanges();
+
+    el.querySelector<HTMLButtonElement>('[data-testid="external-approve-btn"]')!.click();
+    fixture.detectChanges();
+
+    expect(payExternalSpy).toHaveBeenCalledTimes(1);
+    expect(payExternalSpy).toHaveBeenCalledWith('sale-1', {
+      method: 'EXTERNAL_CREDIT',
+      approved: true,
+    });
+    expect(el.querySelector('[data-testid="sale-status-badge"]')?.textContent).toContain(
+      'Concluída',
+    );
+    expect(el.textContent).toContain('Venda concluída');
+    expect(el.querySelector('[data-testid="completed-payment-method"]')?.textContent).toContain(
+      'Crédito externo',
+    );
+  });
+
+  it('US07 CA1: clicar em Aprovado na máquina para Débito externo conclui a venda exibindo Débito externo', async () => {
+    const fixture = setup();
+    const approvedResponse: PaymentResponse = {
+      payment: {
+        id: 'pay-ext-debit-1',
+        saleId: 'sale-1',
+        method: 'EXTERNAL_DEBIT',
+        status: 'APPROVED',
+        amountCents: 2500,
+        gatewayPaymentId: null,
+        qrCode: null,
+        qrCodeBase64: null,
+        createdAt: '2026-11-27T15:05:00.000Z',
+      },
+      sale: {
+        ...openSale,
+        status: 'COMPLETED',
+        completedAt: '2026-11-27T15:05:01.000Z',
+      },
+    };
+    payExternalSpy.mockReturnValue(of(approvedResponse));
+
+    const el = await addFirstProductAndProceed(fixture);
+
+    el.querySelector<HTMLButtonElement>('[data-testid="select-method-external-debit"]')!.click();
+    fixture.detectChanges();
+
+    el.querySelector<HTMLButtonElement>('[data-testid="external-approve-btn"]')!.click();
+    fixture.detectChanges();
+
+    expect(payExternalSpy).toHaveBeenCalledTimes(1);
+    expect(payExternalSpy).toHaveBeenCalledWith('sale-1', {
+      method: 'EXTERNAL_DEBIT',
+      approved: true,
+    });
+    expect(el.querySelector('[data-testid="sale-status-badge"]')?.textContent).toContain(
+      'Concluída',
+    );
+    expect(el.textContent).toContain('Venda concluída');
+    expect(el.querySelector('[data-testid="completed-payment-method"]')?.textContent).toContain(
+      'Débito externo',
+    );
+  });
+
+  it('US07 CA2: clicar em Não aprovado na máquina mantém venda OPEN, exibe alerta sem botão de cartão e permite retentar ou trocar forma', async () => {
+    const fixture = setup();
+    const declinedResponse: PaymentResponse = {
+      payment: {
+        id: 'pay-ext-declined-1',
+        saleId: 'sale-1',
+        method: 'EXTERNAL_DEBIT',
+        status: 'DECLINED',
+        amountCents: 2500,
+        gatewayPaymentId: null,
+        qrCode: null,
+        qrCodeBase64: null,
+        createdAt: '2026-11-27T15:10:00.000Z',
+      },
+      sale: openSale,
+    };
+    payExternalSpy.mockReturnValueOnce(of(declinedResponse));
+
+    const el = await addFirstProductAndProceed(fixture);
+
+    el.querySelector<HTMLButtonElement>('[data-testid="select-method-external-debit"]')!.click();
+    fixture.detectChanges();
+
+    el.querySelector<HTMLButtonElement>('[data-testid="external-decline-btn"]')!.click();
+    fixture.detectChanges();
+
+    expect(payExternalSpy).toHaveBeenCalledTimes(1);
+    expect(payExternalSpy).toHaveBeenCalledWith('sale-1', {
+      method: 'EXTERNAL_DEBIT',
+      approved: false,
+    });
+    expect(el.querySelector('[data-testid="sale-status-badge"]')?.textContent).toContain(
+      'Venda aberta',
+    );
+    expect(el.textContent).not.toContain('Venda concluída');
+
+    const declinedAlert = el.querySelector('[data-testid="payment-declined-alert"]');
+    expect(declinedAlert).not.toBeNull();
+    expect(declinedAlert?.getAttribute('role')).toBe('alert');
+    expect(declinedAlert?.textContent).toContain('não aprovado');
+    expect(el.querySelector('[data-testid="retry-card"]')).toBeNull();
+
+    // Pode tentar novamente na mesma forma externa
+    const approveBtn = el.querySelector<HTMLButtonElement>('[data-testid="external-approve-btn"]')!;
+    const declineBtn = el.querySelector<HTMLButtonElement>('[data-testid="external-decline-btn"]')!;
+    expect(approveBtn.disabled).toBe(false);
+    expect(declineBtn.disabled).toBe(false);
+
+    // Também pode trocar de forma de pagamento
+    el.querySelector<HTMLButtonElement>('[data-testid="select-method-pix"]')!.click();
+    fixture.detectChanges();
+    expect(el.querySelector('[data-testid="generate-pix"]')).not.toBeNull();
+  });
+
+  it('US07 CA5: desabilita botões de confirmação e seletores durante envio em andamento para evitar duplo clique', async () => {
+    const fixture = setup();
+    const external$ = new Subject<PaymentResponse>();
+    payExternalSpy.mockReturnValue(external$.asObservable());
+
+    const el = await addFirstProductAndProceed(fixture);
+
+    el.querySelector<HTMLButtonElement>('[data-testid="select-method-external-credit"]')!.click();
+    fixture.detectChanges();
+
+    const approveBtn = el.querySelector<HTMLButtonElement>('[data-testid="external-approve-btn"]')!;
+    const declineBtn = el.querySelector<HTMLButtonElement>('[data-testid="external-decline-btn"]')!;
+    const pixTab = el.querySelector<HTMLButtonElement>('[data-testid="select-method-pix"]')!;
+
+    approveBtn.click();
+    fixture.detectChanges();
+
+    expect(approveBtn.disabled).toBe(true);
+    expect(declineBtn.disabled).toBe(true);
+    expect(pixTab.disabled).toBe(true);
+
+    // Cliques adicionais enquanto carrega não disparam novas requisições
+    approveBtn.click();
+    declineBtn.click();
+    expect(payExternalSpy).toHaveBeenCalledTimes(1);
+
+    external$.next({
+      payment: {
+        id: 'pay-ext-credit-2',
+        saleId: 'sale-1',
+        method: 'EXTERNAL_CREDIT',
+        status: 'APPROVED',
+        amountCents: 2500,
+        gatewayPaymentId: null,
+        qrCode: null,
+        qrCodeBase64: null,
+        createdAt: '2026-11-27T15:12:00.000Z',
+      },
+      sale: {
+        ...openSale,
+        status: 'COMPLETED',
+        completedAt: '2026-11-27T15:12:01.000Z',
+      },
+    });
+    external$.complete();
+    fixture.detectChanges();
+
+    expect(el.textContent).toContain('Venda concluída');
+  });
+
+  it('US07 CA6: trocar de método externo sem confirmar nunca dispara requisição e erro de rede mantém venda OPEN com alerta claro', async () => {
+    const fixture = setup();
+    const el = await addFirstProductAndProceed(fixture);
+
+    // Troca entre métodos sem confirmar
+    el.querySelector<HTMLButtonElement>('[data-testid="select-method-external-credit"]')!.click();
+    fixture.detectChanges();
+    el.querySelector<HTMLButtonElement>('[data-testid="select-method-external-debit"]')!.click();
+    fixture.detectChanges();
+    el.querySelector<HTMLButtonElement>('[data-testid="select-method-pix"]')!.click();
+    fixture.detectChanges();
+    el.querySelector<HTMLButtonElement>('[data-testid="select-method-external-credit"]')!.click();
+    fixture.detectChanges();
+
+    expect(payExternalSpy).not.toHaveBeenCalled();
+
+    // Simula erro de rede ao confirmar
+    payExternalSpy.mockReturnValueOnce(
+      throwError(() => new HttpErrorResponse({ status: 0, statusText: 'Unknown Error' })),
+    );
+
+    const approveBtn = el.querySelector<HTMLButtonElement>('[data-testid="external-approve-btn"]')!;
+    const declineBtn = el.querySelector<HTMLButtonElement>('[data-testid="external-decline-btn"]')!;
+    approveBtn.click();
+    fixture.detectChanges();
+
+    expect(el.querySelector('[data-testid="sale-status-badge"]')?.textContent).toContain(
+      'Venda aberta',
+    );
+    expect(el.textContent).toContain('Não foi possível conectar. Tente novamente.');
+    expect(el.textContent).not.toContain('Venda concluída');
+    expect(approveBtn.disabled).toBe(false);
+    expect(declineBtn.disabled).toBe(false);
   });
 });

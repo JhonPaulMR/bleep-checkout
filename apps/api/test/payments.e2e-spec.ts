@@ -798,4 +798,279 @@ describe('Pagamentos — /payments/config, /sales/:id/payments/card e /sales/:id
       expect(response.body.message).toBe('Venda não encontrada.');
     });
   });
+
+  describe('POST /sales/:id/payments/external', () => {
+    it.each([PaymentMethod.EXTERNAL_CREDIT, PaymentMethod.EXTERNAL_DEBIT])(
+      'devolve 201 com approved true para %s, grava Payment APPROVED e conclui Sale em COMPLETED com completedAt',
+      async (method) => {
+        const operatorToken = await login(
+          process.env.SEED_OPERATOR_EMAIL!,
+          process.env.SEED_OPERATOR_PASSWORD!,
+        );
+        const sale = await createOpenSale(operatorToken, 2590);
+
+        const response = await request(app.getHttpServer())
+          .post(`/sales/${sale.id}/payments/external`)
+          .set('Authorization', `Bearer ${operatorToken}`)
+          .send({ method, approved: true })
+          .expect(201);
+
+        const { payment, sale: updatedSale } = response.body.data;
+
+        expect(payment.method).toBe(method);
+        expect(payment.status).toBe(PaymentStatus.APPROVED);
+        expect(payment.amountCents).toBe(5180);
+        expect(updatedSale.status).toBe(SaleStatus.COMPLETED);
+        expect(updatedSale.completedAt).toBeTruthy();
+        expect(updatedSale.payments).toHaveLength(1);
+        expect(updatedSale.payments[0]).toMatchObject({
+          id: payment.id,
+          method,
+          status: PaymentStatus.APPROVED,
+          amountCents: 5180,
+        });
+
+        const saleInDb = await prisma.sale.findUniqueOrThrow({
+          where: { id: sale.id },
+          include: { payments: true },
+        });
+        expect(saleInDb.status).toBe(SaleStatus.COMPLETED);
+        expect(saleInDb.completedAt).toBeInstanceOf(Date);
+        expect(saleInDb.payments).toHaveLength(1);
+        expect(saleInDb.payments[0]).toMatchObject({
+          method,
+          status: PaymentStatus.APPROVED,
+          amountCents: 5180,
+        });
+      },
+    );
+
+    it.each([PaymentMethod.EXTERNAL_CREDIT, PaymentMethod.EXTERNAL_DEBIT])(
+      'devolve 201 com approved false para %s, grava Payment DECLINED, mantém Sale em OPEN e permite nova tentativa',
+      async (method) => {
+        const operatorToken = await login(
+          process.env.SEED_OPERATOR_EMAIL!,
+          process.env.SEED_OPERATOR_PASSWORD!,
+        );
+        const sale = await createOpenSale(operatorToken, 1500);
+
+        const declinedResponse = await request(app.getHttpServer())
+          .post(`/sales/${sale.id}/payments/external`)
+          .set('Authorization', `Bearer ${operatorToken}`)
+          .send({ method, approved: false })
+          .expect(201);
+
+        const { payment, sale: openSale } = declinedResponse.body.data;
+
+        expect(payment.method).toBe(method);
+        expect(payment.status).toBe(PaymentStatus.DECLINED);
+        expect(payment.amountCents).toBe(3000);
+        expect(openSale.status).toBe(SaleStatus.OPEN);
+        expect(openSale.completedAt).toBeNull();
+        expect(openSale.payments).toHaveLength(1);
+        expect(openSale.payments[0]).toMatchObject({
+          id: payment.id,
+          method,
+          status: PaymentStatus.DECLINED,
+        });
+
+        const saleInDb = await prisma.sale.findUniqueOrThrow({
+          where: { id: sale.id },
+          include: { payments: true },
+        });
+        expect(saleInDb.status).toBe(SaleStatus.OPEN);
+        expect(saleInDb.completedAt).toBeNull();
+        expect(saleInDb.payments).toHaveLength(1);
+        expect(saleInDb.payments[0].status).toBe(PaymentStatus.DECLINED);
+
+        const approvedResponse = await request(app.getHttpServer())
+          .post(`/sales/${sale.id}/payments/external`)
+          .set('Authorization', `Bearer ${operatorToken}`)
+          .send({ method, approved: true })
+          .expect(201);
+
+        expect(approvedResponse.body.data.payment.status).toBe(
+          PaymentStatus.APPROVED,
+        );
+        expect(approvedResponse.body.data.sale.status).toBe(
+          SaleStatus.COMPLETED,
+        );
+        expect(approvedResponse.body.data.sale.payments).toHaveLength(2);
+      },
+    );
+
+    it.each([
+      ['method CARD', { method: PaymentMethod.CARD, approved: true }],
+      ['method PIX', { method: PaymentMethod.PIX, approved: true }],
+      [
+        'method CUSTOMER_CREDIT',
+        { method: PaymentMethod.CUSTOMER_CREDIT, approved: true },
+      ],
+      ['method inválido', { method: 'DINHEIRO', approved: true }],
+      ['method ausente', { approved: true }],
+      ['approved ausente', { method: PaymentMethod.EXTERNAL_CREDIT }],
+      [
+        'approved string',
+        { method: PaymentMethod.EXTERNAL_CREDIT, approved: 'true' },
+      ],
+      [
+        'approved numérico',
+        { method: PaymentMethod.EXTERNAL_DEBIT, approved: 1 },
+      ],
+      [
+        'campo extra não permitido',
+        {
+          method: PaymentMethod.EXTERNAL_CREDIT,
+          approved: true,
+          amountCents: 1,
+        },
+      ],
+    ])(
+      'devolve 400 para payload inválido (%s) sem criar Payment nem alterar Sale',
+      async (_label, payload) => {
+        const operatorToken = await login(
+          process.env.SEED_OPERATOR_EMAIL!,
+          process.env.SEED_OPERATOR_PASSWORD!,
+        );
+        const sale = await createOpenSale(operatorToken, 1000);
+
+        await request(app.getHttpServer())
+          .post(`/sales/${sale.id}/payments/external`)
+          .set('Authorization', `Bearer ${operatorToken}`)
+          .send(payload)
+          .expect(400);
+
+        const saleInDb = await prisma.sale.findUniqueOrThrow({
+          where: { id: sale.id },
+          include: { payments: true },
+        });
+        expect(saleInDb.status).toBe(SaleStatus.OPEN);
+        expect(saleInDb.completedAt).toBeNull();
+        expect(saleInDb.payments).toHaveLength(0);
+      },
+    );
+
+    it('devolve 401 sem token JWT', async () => {
+      await request(app.getHttpServer())
+        .post(`/sales/${randomUUID()}/payments/external`)
+        .send({ method: PaymentMethod.EXTERNAL_CREDIT, approved: true })
+        .expect(401);
+    });
+
+    it('devolve 403 para MANAGER', async () => {
+      const managerToken = await login(
+        process.env.SEED_MANAGER_EMAIL!,
+        process.env.SEED_MANAGER_PASSWORD!,
+      );
+
+      await request(app.getHttpServer())
+        .post(`/sales/${randomUUID()}/payments/external`)
+        .set('Authorization', `Bearer ${managerToken}`)
+        .send({ method: PaymentMethod.EXTERNAL_CREDIT, approved: true })
+        .expect(403);
+    });
+
+    it('devolve 403 quando outro OPERATOR tenta registrar pagamento externo da venda', async () => {
+      const operatorToken = await login(
+        process.env.SEED_OPERATOR_EMAIL!,
+        process.env.SEED_OPERATOR_PASSWORD!,
+      );
+      const sale = await createOpenSale(operatorToken, 1000);
+
+      const otherOp = await createTestOperator();
+      const otherToken = await login(otherOp.email, otherOp.password);
+
+      await request(app.getHttpServer())
+        .post(`/sales/${sale.id}/payments/external`)
+        .set('Authorization', `Bearer ${otherToken}`)
+        .send({ method: PaymentMethod.EXTERNAL_DEBIT, approved: true })
+        .expect(403);
+
+      const saleInDb = await prisma.sale.findUniqueOrThrow({
+        where: { id: sale.id },
+        include: { payments: true },
+      });
+      expect(saleInDb.status).toBe(SaleStatus.OPEN);
+      expect(saleInDb.payments).toHaveLength(0);
+    });
+
+    it('devolve 404 para venda inexistente', async () => {
+      const operatorToken = await login(
+        process.env.SEED_OPERATOR_EMAIL!,
+        process.env.SEED_OPERATOR_PASSWORD!,
+      );
+
+      const response = await request(app.getHttpServer())
+        .post(`/sales/${randomUUID()}/payments/external`)
+        .set('Authorization', `Bearer ${operatorToken}`)
+        .send({ method: PaymentMethod.EXTERNAL_CREDIT, approved: true })
+        .expect(404);
+
+      expect(response.body.message).toBe('Venda não encontrada.');
+    });
+
+    it('devolve 422 ao tentar registrar pagamento externo em venda já COMPLETED (duplo clique/retentativa) sem criar novo Payment', async () => {
+      const operatorToken = await login(
+        process.env.SEED_OPERATOR_EMAIL!,
+        process.env.SEED_OPERATOR_PASSWORD!,
+      );
+      const sale = await createOpenSale(operatorToken, 1000);
+
+      await request(app.getHttpServer())
+        .post(`/sales/${sale.id}/payments/external`)
+        .set('Authorization', `Bearer ${operatorToken}`)
+        .send({ method: PaymentMethod.EXTERNAL_CREDIT, approved: true })
+        .expect(201);
+
+      const secondResponse = await request(app.getHttpServer())
+        .post(`/sales/${sale.id}/payments/external`)
+        .set('Authorization', `Bearer ${operatorToken}`)
+        .send({ method: PaymentMethod.EXTERNAL_CREDIT, approved: true })
+        .expect(422);
+
+      expect(secondResponse.body.message).toBe(
+        'A venda não está aberta para pagamento.',
+      );
+
+      const saleInDb = await prisma.sale.findUniqueOrThrow({
+        where: { id: sale.id },
+        include: { payments: true },
+      });
+      expect(saleInDb.status).toBe(SaleStatus.COMPLETED);
+      expect(saleInDb.payments).toHaveLength(1);
+    });
+
+    it.each([SaleStatus.PENDING, SaleStatus.CANCELED])(
+      'devolve 422 ("A venda não está aberta para pagamento.") quando a venda está em %s sem criar Payment',
+      async (status) => {
+        const operatorToken = await login(
+          process.env.SEED_OPERATOR_EMAIL!,
+          process.env.SEED_OPERATOR_PASSWORD!,
+        );
+        const sale = await createOpenSale(operatorToken, 1000);
+
+        await prisma.sale.update({
+          where: { id: sale.id },
+          data: { status },
+        });
+
+        const response = await request(app.getHttpServer())
+          .post(`/sales/${sale.id}/payments/external`)
+          .set('Authorization', `Bearer ${operatorToken}`)
+          .send({ method: PaymentMethod.EXTERNAL_DEBIT, approved: true })
+          .expect(422);
+
+        expect(response.body.message).toBe(
+          'A venda não está aberta para pagamento.',
+        );
+
+        const saleInDb = await prisma.sale.findUniqueOrThrow({
+          where: { id: sale.id },
+          include: { payments: true },
+        });
+        expect(saleInDb.status).toBe(status);
+        expect(saleInDb.payments).toHaveLength(0);
+      },
+    );
+  });
 });

@@ -9,6 +9,7 @@ import {
 import { Role } from '../../../generated/prisma/enums.js';
 import { Roles } from '../../common/decorators/roles.decorator.js';
 import type { JwtPayload } from '../../common/guards/jwt-auth.guard.js';
+import { PayExternalDto } from './dto/pay-external.dto.js';
 import { PayWithCardDto } from './dto/pay-with-card.dto.js';
 import { PaymentsService } from './payments.service.js';
 
@@ -133,5 +134,38 @@ export class PaymentsController {
     @Req() request: { user: JwtPayload },
   ) {
     return this.payments.payWithCustomerCredit(saleId, request.user.sub);
+  }
+
+  @Post('sales/:id/payments/external')
+  @Roles(Role.OPERATOR)
+  @ApiOperation({
+    summary:
+      'Registra o resultado de um pagamento externo de crédito ou débito na máquina',
+  })
+  @ApiResponse({
+    status: 201,
+    description:
+      'Pagamento externo registrado (aprovado concluindo a venda ou recusado mantendo a venda aberta)',
+  })
+  @ApiResponse({ status: 400, description: 'Corpo da requisição inválido' })
+  @ApiResponse({
+    status: 401,
+    description: 'Sessão ausente, inválida ou expirada',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Acesso negado para outro operador ou gerente',
+  })
+  @ApiResponse({ status: 404, description: 'Venda não encontrada.' })
+  @ApiResponse({
+    status: 422,
+    description: 'A venda não está aberta para pagamento.',
+  })
+  payExternal(
+    @Param('id') saleId: string,
+    @Body() body: PayExternalDto,
+    @Req() request: { user: JwtPayload },
+  ) {
+    return this.payments.payExternal(saleId, body, request.user.sub);
   }
 }
