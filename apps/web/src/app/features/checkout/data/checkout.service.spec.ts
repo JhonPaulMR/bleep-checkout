@@ -434,6 +434,27 @@ describe('CheckoutService', () => {
     expect(result).toEqual(sampleSale);
   });
 
+  it('cancelSale() faz POST /sales/:id/cancel com saleId codificado e corpo vazio, desembrulhando { data }', () => {
+    let result: Sale | undefined;
+    const canceledSale: Sale = {
+      ...sampleSale,
+      id: 'sale/1',
+      status: 'CANCELED',
+      completedAt: null,
+    };
+
+    service.cancelSale('sale/1').subscribe((sale) => {
+      result = sale;
+    });
+
+    const req = controller.expectOne(`${apiUrl}/sales/sale%2F1/cancel`);
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body).toEqual({});
+    req.flush({ data: canceledSale });
+
+    expect(result).toEqual(canceledSale);
+  });
+
   it('pollSaleUntilSettled() consulta GET /sales/:id periodicamente e encerra ao sair de PENDING', async () => {
     vi.useFakeTimers();
     const pendingSale: Sale = { ...sampleSale, status: 'PENDING' };

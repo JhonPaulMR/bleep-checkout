@@ -29,7 +29,7 @@
   - Teste primeiro: testes unitários em `sales.service.spec.ts` (cancelamento de `OPEN`, cancelamento de `PENDING` abandonando `Payment` `PENDING`, `404`, `403`, `422` em `COMPLETED`/`CANCELED` e corrida `updateMany.count === 0`) e testes e2e em `apps/api/test/sales.e2e-spec.ts` contra PostgreSQL real cobrindo `201` para `OPEN` e `PENDING`, `401`, `403` (`MANAGER` e outro `OPERATOR`), `404` e `422` (`COMPLETED` e `CANCELED`, mais garantia de que webhook/pagamento posterior não conclui venda cancelada); falham porque `POST /sales/:id/cancel` e `SalesService.cancel` ainda não existem
   - Arquivos previstos: `apps/api/src/modules/payments/payment-state-machine.ts`, `apps/api/src/modules/payments/payment-state-machine.spec.ts`, `apps/api/src/modules/sales/sales.controller.ts`, `apps/api/src/modules/sales/sales.service.ts`, `apps/api/src/modules/sales/sales.service.spec.ts`, `apps/api/test/sales.e2e-spec.ts`
 
-- [ ] **Tarefa 2 — Adicionar `cancelSale()` ao `CheckoutService`**
+- [x] **Tarefa 2 — Adicionar `cancelSale()` ao `CheckoutService`**
   - Cobre: CA3 (chamada HTTP `POST /sales/:id/cancel` com `encodeURIComponent` desembrulhando `{ data }`)
   - Teste primeiro: teste unitário em `checkout.service.spec.ts` verificando `cancelSale(saleId)` enviando `POST /sales/:id/cancel` com `saleId` codificado e retornando `Sale` com status `CANCELED`; falha porque `cancelSale` ainda não existe
   - Arquivos previstos: `apps/web/src/app/features/checkout/data/checkout.service.ts`, `apps/web/src/app/features/checkout/data/checkout.service.spec.ts`
