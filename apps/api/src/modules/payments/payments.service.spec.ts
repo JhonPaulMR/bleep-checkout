@@ -17,6 +17,7 @@ describe('PaymentsService', () => {
   let prisma: {
     sale: {
       findUnique: ReturnType<typeof vi.fn>;
+      findFirst: ReturnType<typeof vi.fn>;
       findUniqueOrThrow: ReturnType<typeof vi.fn>;
       update: ReturnType<typeof vi.fn>;
       updateMany: ReturnType<typeof vi.fn>;
@@ -66,6 +67,7 @@ describe('PaymentsService', () => {
     prisma = {
       sale: {
         findUnique: vi.fn(),
+        findFirst: vi.fn(),
         findUniqueOrThrow: vi.fn(),
         update: vi.fn(),
         updateMany: vi.fn(),
@@ -691,6 +693,248 @@ describe('PaymentsService', () => {
       expect(error).toBeInstanceOf(UnprocessableEntityException);
       expect(prisma.payment.create).not.toHaveBeenCalled();
       expect(prisma.creditTransaction.create).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('payExternal', () => {
+    it.each([PaymentMethod.EXTERNAL_CREDIT, PaymentMethod.EXTERNAL_DEBIT])(
+      'cria Payment APPROVED com %s e conclui Sale em COMPLETED com completedAt em transação atômica quando approved é true',
+      async (method) => {
+        prisma.sale.findUnique.mockResolvedValue(baseSale);
+        prisma.sale.updateMany.mockResolvedValue({ count: 1 });
+
+        const createdPayment = {
+          id: 'pay-ext-1',
+          saleId: 'sale-1',
+          method,
+          status: PaymentStatus.APPROVED,
+          amountCents: 3580,
+          gatewayPaymentId: null,
+          qrCode: null,
+          qrCodeBase64: null,
+          createdAt: new Date('2026-11-27T12:00:00.000Z'),
+        };
+        prisma.payment.create.mockResolvedValue(createdPayment);
+
+        const updatedSale = {
+          id: baseSale.id,
+          number: baseSale.number,
+          operatorId: baseSale.operatorId,
+          customerId: null,
+          status: SaleStatus.COMPLETED,
+          totalCents: baseSale.totalCents,
+          createdAt: baseSale.createdAt,
+          completedAt: new Date('2026-11-27T12:00:01.000Z'),
+          items: [],
+          payments: [createdPayment],
+          customer: null,
+        };
+        prisma.sale.findUniqueOrThrow.mockResolvedValue(updatedSale);
+
+        const result = await service.payExternal(
+          'sale-1',
+          { method, approved: true },
+          'op-1',
+        );
+
+        expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+        expect(prisma.sale.updateMany).toHaveBeenCalledWith({
+          where: {
+            id: 'sale-1',
+            status: SaleStatus.OPEN,
+          },
+          data: {
+            status: SaleStatus.COMPLETED,
+            completedAt: expect.any(Date),
+          },
+        });
+        expect(prisma.payment.create).toHaveBeenCalledWith({
+          data: {
+            saleId: 'sale-1',
+            method,
+            status: PaymentStatus.APPROVED,
+            amountCents: 3580,
+          },
+        });
+        expect(prisma.sale.findUniqueOrThrow).toHaveBeenCalledWith({
+          where: { id: 'sale-1' },
+          include: {
+            items: { include: { product: true } },
+            payments: true,
+            customer: true,
+          },
+        });
+        expect(result).toEqual({
+          payment: createdPayment,
+          sale: updatedSale,
+        });
+      },
+    );
+
+    it.each([PaymentMethod.EXTERNAL_CREDIT, PaymentMethod.EXTERNAL_DEBIT])(
+      'cria Payment DECLINED com %s e mantém Sale em OPEN com completedAt nulo quando approved é false',
+      async (method) => {
+        prisma.sale.findUnique.mockResolvedValue(baseSale);
+
+        const openSale = {
+          id: baseSale.id,
+          number: baseSale.number,
+          operatorId: baseSale.operatorId,
+          customerId: null,
+          status: SaleStatus.OPEN,
+          totalCents: baseSale.totalCents,
+          createdAt: baseSale.createdAt,
+          completedAt: null,
+          items: [],
+          payments: [],
+          customer: null,
+        };
+        prisma.sale.findFirst.mockResolvedValue(openSale);
+
+        const declinedPayment = {
+          id: 'pay-ext-2',
+          saleId: 'sale-1',
+          method,
+          status: PaymentStatus.DECLINED,
+          amountCents: 3580,
+          gatewayPaymentId: null,
+          qrCode: null,
+          qrCodeBase64: null,
+          createdAt: new Date('2026-11-27T12:05:00.000Z'),
+        };
+        prisma.payment.create.mockResolvedValue(declinedPayment);
+
+        const result = await service.payExternal(
+          'sale-1',
+          { method, approved: false },
+          'op-1',
+        );
+
+        expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+        expect(prisma.sale.findFirst).toHaveBeenCalledWith({
+          where: {
+            id: 'sale-1',
+            status: SaleStatus.OPEN,
+          },
+          include: {
+            items: { include: { product: true } },
+            payments: true,
+            customer: true,
+          },
+        });
+        expect(prisma.payment.create).toHaveBeenCalledWith({
+          data: {
+            saleId: 'sale-1',
+            method,
+            status: PaymentStatus.DECLINED,
+            amountCents: 3580,
+          },
+        });
+        expect(prisma.sale.update).not.toHaveBeenCalled();
+        expect(prisma.sale.updateMany).not.toHaveBeenCalled();
+        expect(result).toEqual({
+          payment: declinedPayment,
+          sale: {
+            ...openSale,
+            payments: [declinedPayment],
+          },
+        });
+        expect(result.sale.status).toBe(SaleStatus.OPEN);
+        expect(result.sale.completedAt).toBeNull();
+      },
+    );
+
+    it('rejeita com NotFoundException quando a venda não existe', async () => {
+      prisma.sale.findUnique.mockResolvedValue(null);
+
+      const error = await service
+        .payExternal(
+          'sale-inexistente',
+          { method: PaymentMethod.EXTERNAL_CREDIT, approved: true },
+          'op-1',
+        )
+        .catch((e) => e);
+
+      expect(error).toBeInstanceOf(NotFoundException);
+      expect((error as NotFoundException).message).toBe('Venda não encontrada.');
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+      expect(prisma.payment.create).not.toHaveBeenCalled();
+    });
+
+    it('rejeita com ForbiddenException quando outro operador tenta registrar pagamento externo', async () => {
+      prisma.sale.findUnique.mockResolvedValue(baseSale);
+
+      const error = await service
+        .payExternal(
+          'sale-1',
+          { method: PaymentMethod.EXTERNAL_DEBIT, approved: true },
+          'op-2',
+        )
+        .catch((e) => e);
+
+      expect(error).toBeInstanceOf(ForbiddenException);
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+      expect(prisma.payment.create).not.toHaveBeenCalled();
+    });
+
+    it.each([SaleStatus.COMPLETED, SaleStatus.PENDING, SaleStatus.CANCELED])(
+      'rejeita com UnprocessableEntityException quando a venda está em %s',
+      async (status) => {
+        prisma.sale.findUnique.mockResolvedValue({ ...baseSale, status });
+
+        const error = await service
+          .payExternal(
+            'sale-1',
+            { method: PaymentMethod.EXTERNAL_CREDIT, approved: true },
+            'op-1',
+          )
+          .catch((e) => e);
+
+        expect(error).toBeInstanceOf(UnprocessableEntityException);
+        expect((error as UnprocessableEntityException).message).toBe(
+          'A venda não está aberta para pagamento.',
+        );
+        expect(prisma.$transaction).not.toHaveBeenCalled();
+        expect(prisma.payment.create).not.toHaveBeenCalled();
+      },
+    );
+
+    it('rejeita com UnprocessableEntityException quando venda deixa de estar OPEN dentro da transação com approved true', async () => {
+      prisma.sale.findUnique.mockResolvedValue(baseSale);
+      prisma.sale.updateMany.mockResolvedValue({ count: 0 });
+
+      const error = await service
+        .payExternal(
+          'sale-1',
+          { method: PaymentMethod.EXTERNAL_CREDIT, approved: true },
+          'op-1',
+        )
+        .catch((e) => e);
+
+      expect(error).toBeInstanceOf(UnprocessableEntityException);
+      expect((error as UnprocessableEntityException).message).toBe(
+        'A venda não está aberta para pagamento.',
+      );
+      expect(prisma.payment.create).not.toHaveBeenCalled();
+    });
+
+    it('rejeita com UnprocessableEntityException quando venda deixa de estar OPEN dentro da transação com approved false', async () => {
+      prisma.sale.findUnique.mockResolvedValue(baseSale);
+      prisma.sale.findFirst.mockResolvedValue(null);
+
+      const error = await service
+        .payExternal(
+          'sale-1',
+          { method: PaymentMethod.EXTERNAL_DEBIT, approved: false },
+          'op-1',
+        )
+        .catch((e) => e);
+
+      expect(error).toBeInstanceOf(UnprocessableEntityException);
+      expect((error as UnprocessableEntityException).message).toBe(
+        'A venda não está aberta para pagamento.',
+      );
+      expect(prisma.payment.create).not.toHaveBeenCalled();
     });
   });
 });

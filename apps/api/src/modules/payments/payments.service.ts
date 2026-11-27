@@ -12,6 +12,7 @@ import {
   SaleStatus,
 } from '../../../generated/prisma/enums.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
+import { PayExternalDto } from './dto/pay-external.dto.js';
 import { PayWithCardDto } from './dto/pay-with-card.dto.js';
 import {
   PAYMENT_GATEWAY,
@@ -275,6 +276,86 @@ export class PaymentsService {
         sale: updatedSale,
         payment,
         customerBalanceCents: updatedCustomer.balanceCents,
+      };
+    });
+  }
+
+  async payExternal(saleId: string, dto: PayExternalDto, operatorId: string) {
+    const sale = await this.findOpenOwnedSale(saleId, operatorId);
+
+    return this.prisma.$transaction(async (tx) => {
+      if (dto.approved) {
+        const updatedSaleCount = await tx.sale.updateMany({
+          where: {
+            id: sale.id,
+            status: SaleStatus.OPEN,
+          },
+          data: {
+            status: SaleStatus.COMPLETED,
+            completedAt: new Date(),
+          },
+        });
+
+        if (updatedSaleCount.count === 0) {
+          throw new UnprocessableEntityException(
+            'A venda não está aberta para pagamento.',
+          );
+        }
+
+        const payment = await tx.payment.create({
+          data: {
+            saleId: sale.id,
+            method: dto.method,
+            status: PaymentStatus.APPROVED,
+            amountCents: sale.totalCents,
+          },
+        });
+
+        const updatedSale = await tx.sale.findUniqueOrThrow({
+          where: { id: sale.id },
+          include: {
+            items: { include: { product: true } },
+            payments: true,
+            customer: true,
+          },
+        });
+
+        return { payment, sale: updatedSale };
+      }
+
+      const openSale = await tx.sale.findFirst({
+        where: {
+          id: sale.id,
+          status: SaleStatus.OPEN,
+        },
+        include: {
+          items: { include: { product: true } },
+          payments: true,
+          customer: true,
+        },
+      });
+
+      if (!openSale) {
+        throw new UnprocessableEntityException(
+          'A venda não está aberta para pagamento.',
+        );
+      }
+
+      const payment = await tx.payment.create({
+        data: {
+          saleId: sale.id,
+          method: dto.method,
+          status: PaymentStatus.DECLINED,
+          amountCents: sale.totalCents,
+        },
+      });
+
+      return {
+        payment,
+        sale: {
+          ...openSale,
+          payments: [...openSale.payments, payment],
+        },
       };
     });
   }

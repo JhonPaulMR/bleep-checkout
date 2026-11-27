@@ -33,7 +33,7 @@
 
 ## Tarefas
 
-- [ ] **Tarefa 1 — Implementar `POST /sales/:id/payments/external` com `PayExternalDto` e transação atômica na API (unit + e2e)**
+- [x] **Tarefa 1 — Implementar `POST /sales/:id/payments/external` com `PayExternalDto` e transação atômica na API (unit + e2e)**
   - Cobre: CA1 (lado da API — `Payment` `APPROVED` + `Sale` `COMPLETED` com `completedAt` em transação atômica), CA2 (lado da API — `Payment` `DECLINED` mantendo `Sale` `OPEN` e `completedAt` nulo), CA3 (lado da API — `400` para payload inválido sem criar `Payment` nem alterar `Sale`), CA4 (`403` para `MANAGER` ou outro `OPERATOR` e `404` para venda inexistente), CA5 (lado da API — `422` `"A venda não está aberta para pagamento."` para venda fora de `OPEN` e proteção contra duplo clique)
   - Teste primeiro: testes unitários em `payments.service.spec.ts` e testes e2e em `apps/api/test/payments.e2e-spec.ts` contra PostgreSQL real cobrindo `EXTERNAL_CREDIT` e `EXTERNAL_DEBIT` com `approved: true` e `approved: false`, `400` para `method` inválido ou `approved` ausente/não booleano, `403` (`MANAGER` e outro `OPERATOR`), `404` venda inexistente e `422` venda já `COMPLETED`/`PENDING`/`CANCELED`; falham porque o DTO, o método de serviço e a rota ainda não existem
   - Arquivos previstos: `apps/api/src/modules/payments/dto/pay-external.dto.ts`, `apps/api/src/modules/payments/payments.controller.ts`, `apps/api/src/modules/payments/payments.service.ts`, `apps/api/src/modules/payments/payments.service.spec.ts`, `apps/api/test/payments.e2e-spec.ts`
