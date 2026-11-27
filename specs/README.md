@@ -11,5 +11,6 @@
 | #4 | [004-montar-venda-no-simulador-de-caixa](004-montar-venda-no-simulador-de-caixa/spec.md) | implementada | US03 — Montar venda no simulador de caixa |
 | #5 | [005-inserir-quantidade-de-produtos-na-venda](005-inserir-quantidade-de-produtos-na-venda/spec.md) | implementada | US04 — Inserir quantidade de produtos na venda |
 | #7 | [007-pagar-com-credito-do-cliente](007-pagar-com-credito-do-cliente/spec.md) | implementada | US05 — Pagar com crédito do cliente |
+| #6 | [006-registrar-pagamento-externo-de-credito-ou-debito](006-registrar-pagamento-externo-de-credito-ou-debito/spec.md) | rascunho | US07 — Registrar pagamento externo de crédito ou débito |
 
 Estados: `rascunho` · `aprovada` · `implementada` · `bloqueada`
