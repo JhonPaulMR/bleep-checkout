@@ -33,7 +33,7 @@ describe('Header', () => {
     ]);
   });
 
-  it('operador vê só Caixa e não vê Clientes nem Produtos (CA4, CA5)', async () => {
+  it('operador vê Caixa e Vendas pendentes e não vê Clientes, Produtos nem Operadores (CA1)', async () => {
     TestBed.inject(AuthService).startSession('t', { name: 'João', role: 'OPERATOR' });
     const el = await render();
 
@@ -41,8 +41,13 @@ describe('Header', () => {
       label: a.textContent?.trim(),
       href: a.getAttribute('href'),
     }));
-    expect(links).toEqual([{ label: 'Caixa', href: '/caixa' }]);
+    expect(links).toEqual([
+      { label: 'Caixa', href: '/caixa' },
+      { label: 'Vendas pendentes', href: '/pendentes' },
+    ]);
     expect(links.some((l) => l.label === 'Clientes')).toBe(false);
+    expect(links.some((l) => l.label === 'Produtos')).toBe(false);
+    expect(links.some((l) => l.label === 'Operadores')).toBe(false);
   });
 
   it('exibe nome do usuário e papel em português para gerente', async () => {

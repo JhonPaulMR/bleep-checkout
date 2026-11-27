@@ -13,7 +13,10 @@ const MENU_BY_ROLE: Record<Role, MenuItem[]> = {
     { label: 'Clientes', path: '/clientes' },
     { label: 'Operadores', path: '/operadores' },
   ],
-  OPERATOR: [{ label: 'Caixa', path: '/caixa' }],
+  OPERATOR: [
+    { label: 'Caixa', path: '/caixa' },
+    { label: 'Vendas pendentes', path: '/pendentes' },
+  ],
 };
 
 const ROLE_LABEL: Record<Role, string> = {
