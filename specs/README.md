@@ -13,5 +13,6 @@
 | #7 | [007-pagar-com-credito-do-cliente](007-pagar-com-credito-do-cliente/spec.md) | implementada | US05 — Pagar com crédito do cliente |
 | #6 | [006-registrar-pagamento-externo-de-credito-ou-debito](006-registrar-pagamento-externo-de-credito-ou-debito/spec.md) | implementada | US07 — Registrar pagamento externo de crédito ou débito |
 | #8 | [008-concluir-ou-cancelar-uma-venda](008-concluir-ou-cancelar-uma-venda/spec.md) | implementada | US08 — Concluir ou cancelar uma venda |
+| #12 | [012-retomar-ou-cancelar-venda-pendente](012-retomar-ou-cancelar-venda-pendente/spec.md) | rascunho | US11 — Retomar ou cancelar venda pendente |
 
 Estados: `rascunho` · `aprovada` · `implementada` · `bloqueada`
