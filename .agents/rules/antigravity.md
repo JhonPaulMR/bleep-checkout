@@ -7,5 +7,5 @@ Estas preferências complementam `.agents/rules/utf-rules.md` (sem revogar os po
    - **Só interrompa o usuário** quando houver apontamento bloqueante de revisor para triagem, bloqueio técnico/ambiental relevante (ex.: Docker/Postgres parado, estouro das 2 rodadas) ou portão obrigatório de aprovação de `spec.md`/`plan.md`.
 3. **Push automático no fechamento + esqueleto do PR:** quando o `auditor-final` retornar `PRONTO PARA PR`, faça o `git push -u origin <branch>` automaticamente (sem abrir o PR — o usuário cria o PR) e entregue o esqueleto completo em Markdown seguindo `.github/pull_request_template.md`, contendo:
    - `Closes #<n>` preenchido;
-   - tópicos objetivos do diff indicando o que abordar na seção **"O que este PR faz e por quê"** (que o usuário escreve com as próprias palavras, ≥ 250 caracteres);
+   - na seção **"O que este PR faz e por quê"**, uma lista visível (fora de comentários HTML) de tópicos objetivos cobrindo **todas** as mudanças do PR (spec/plano, backend, frontend, testes, docs e eventuais arquivos auxiliares) para orientar o usuário a redigir a explicação completa com as próprias palavras (≥ 250 caracteres);
    - seção **"Apontamentos da revisão"** preenchida com os apontamentos aceitos e recusados (com justificativa) a partir de `specs/<NNN>-<slug>/reviews/tarefa-NN-decisoes-rN.md`.
