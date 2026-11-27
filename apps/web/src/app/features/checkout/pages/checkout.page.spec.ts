@@ -42,6 +42,7 @@ describe('CheckoutPage', () => {
   let payWithPixSpy: ReturnType<typeof vi.fn>;
   let payWithCustomerCreditSpy: ReturnType<typeof vi.fn>;
   let payExternalSpy: ReturnType<typeof vi.fn>;
+  let cancelSaleSpy: ReturnType<typeof vi.fn>;
 
   let brickCreateSpy: ReturnType<typeof vi.fn>;
   let brickUnmountSpy: ReturnType<typeof vi.fn<() => void>>;
@@ -151,6 +152,7 @@ describe('CheckoutPage', () => {
     payWithPixSpy = vi.fn();
     payWithCustomerCreditSpy = vi.fn();
     payExternalSpy = vi.fn();
+    cancelSaleSpy = vi.fn();
 
     TestBed.configureTestingModule({
       imports: [CheckoutPage],
@@ -168,6 +170,7 @@ describe('CheckoutPage', () => {
             payWithPix: payWithPixSpy,
             payWithCustomerCredit: payWithCustomerCreditSpy,
             payExternal: payExternalSpy,
+            cancelSale: cancelSaleSpy,
           },
         },
       ],
@@ -1844,5 +1847,494 @@ describe('CheckoutPage', () => {
     expect(el.textContent).not.toContain('Venda concluída');
     expect(approveBtn.disabled).toBe(false);
     expect(declineBtn.disabled).toBe(false);
+  });
+
+  it('US08 CA1: exibe resumo completo da venda concluída (itens, quantidades, subtotais, total e forma de pagamento) para Cartão de crédito sem botão de cancelar', async () => {
+    const fixture = setup();
+    const multiItemSale: Sale = {
+      ...openSale,
+      totalCents: 3300,
+      items: [
+        {
+          id: 'item-1',
+          saleId: 'sale-1',
+          productId: 'prod-1',
+          quantity: 2,
+          unitPriceCents: 1250,
+          product: sampleProducts[0],
+        },
+        {
+          id: 'item-2',
+          saleId: 'sale-1',
+          productId: 'prod-2',
+          quantity: 1,
+          unitPriceCents: 800,
+          product: sampleProducts[1],
+        },
+      ],
+    };
+    createSaleSpy.mockReturnValue(of(multiItemSale));
+    payWithCardSpy.mockReturnValue(
+      of({
+        payment: {
+          id: 'pay-card-ok',
+          saleId: 'sale-1',
+          method: 'CARD',
+          status: 'APPROVED',
+          amountCents: 3300,
+          gatewayPaymentId: 'mp-card-ok',
+          qrCode: null,
+          qrCodeBase64: null,
+          createdAt: '2026-11-27T18:00:00.000Z',
+        },
+        sale: {
+          ...multiItemSale,
+          status: 'COMPLETED',
+          completedAt: '2026-11-27T18:00:01.000Z',
+        },
+      } satisfies PaymentResponse),
+    );
+
+    const el = await addFirstProductAndProceed(fixture);
+
+    await capturedBrickConfig!.callbacks.onSubmit({
+      token: 'tok_approved',
+      payment_method_id: 'master',
+      installments: 1,
+      payer: { identification: { type: 'CPF', number: '19119119100' } },
+    });
+    fixture.detectChanges();
+
+    const summary = el.querySelector('[data-testid="completed-sale-summary"]');
+    expect(summary).not.toBeNull();
+    expect(summary?.textContent).toContain('Café Espresso');
+    expect(summary?.textContent).toContain('2 un');
+    expect(summary?.textContent).toContain('25,00');
+    expect(summary?.textContent).toContain('Pão de Queijo');
+    expect(summary?.textContent).toContain('1 un');
+    expect(summary?.textContent).toContain('8,00');
+    expect(summary?.textContent).toContain('33,00');
+    expect(el.querySelector('[data-testid="completed-payment-method"]')?.textContent).toContain(
+      'Cartão de crédito',
+    );
+    expect(el.querySelector('[data-testid="cancel-sale-btn"]')).toBeNull();
+  });
+
+  it('US08 CA1: exibe resumo completo com rótulo correto para PIX (após polling), Crédito do cliente, Crédito externo e Débito externo, usando fallback do carrinho quando sale.items não vier preenchido', async () => {
+    // 1. PIX confirmado via polling sem items na resposta do sale
+    const fixturePix = setup();
+    const poll$ = new Subject<Sale>();
+    payWithPixSpy.mockReturnValue(
+      of({
+        payment: {
+          id: 'pay-pix-ok',
+          saleId: 'sale-1',
+          method: 'PIX',
+          status: 'PENDING',
+          amountCents: 1250,
+          gatewayPaymentId: 'mp-pix-ok',
+          qrCode: '00020126-pix',
+          qrCodeBase64: null,
+          createdAt: '2026-11-27T18:01:00.000Z',
+        },
+        sale: { ...openSale, totalCents: 1250, status: 'PENDING', items: undefined },
+      } satisfies PaymentResponse),
+    );
+    pollSaleUntilSettledSpy.mockReturnValue(poll$.asObservable());
+
+    const elPix = await addFirstProductAndProceed(fixturePix);
+    elPix.querySelector<HTMLButtonElement>('[data-testid="select-method-pix"]')!.click();
+    fixturePix.detectChanges();
+    elPix.querySelector<HTMLButtonElement>('[data-testid="generate-pix"]')!.click();
+    fixturePix.detectChanges();
+
+    poll$.next({
+      ...openSale,
+      totalCents: 1250,
+      status: 'COMPLETED',
+      completedAt: '2026-11-27T18:01:10.000Z',
+      items: undefined,
+    });
+    poll$.complete();
+    fixturePix.detectChanges();
+
+    const pixSummary = elPix.querySelector('[data-testid="completed-sale-summary"]');
+    expect(pixSummary).not.toBeNull();
+    expect(pixSummary?.textContent).toContain('Café Espresso');
+    expect(pixSummary?.textContent).toContain('1 un');
+    expect(pixSummary?.textContent).toContain('12,50');
+    expect(elPix.querySelector('[data-testid="completed-payment-method"]')?.textContent).toContain(
+      'PIX',
+    );
+    expect(elPix.querySelector('[data-testid="cancel-sale-btn"]')).toBeNull();
+    fixturePix.destroy();
+    TestBed.resetTestingModule();
+
+    // 2. Crédito do cliente
+    const fixtureCredit = setup();
+    const saleWithCustomer: Sale = {
+      ...openSale,
+      customerId: 'cust-1',
+      customer: sampleCustomers[0],
+    };
+    createSaleSpy.mockReturnValue(of(saleWithCustomer));
+    payWithCustomerCreditSpy.mockReturnValue(
+      of({
+        sale: {
+          ...saleWithCustomer,
+          status: 'COMPLETED',
+          completedAt: '2026-11-27T18:02:00.000Z',
+        },
+        payment: {
+          id: 'pay-cc-ok',
+          saleId: 'sale-1',
+          method: 'CUSTOMER_CREDIT',
+          status: 'APPROVED',
+          amountCents: 2500,
+          gatewayPaymentId: null,
+          qrCode: null,
+          qrCodeBase64: null,
+          createdAt: '2026-11-27T18:02:00.000Z',
+        },
+        customerBalanceCents: 12500,
+      } satisfies CustomerCreditPaymentResult),
+    );
+
+    const elCredit = await addFirstProductAndProceed(fixtureCredit);
+    elCredit
+      .querySelector<HTMLButtonElement>('[data-testid="select-method-customer-credit"]')!
+      .click();
+    fixtureCredit.detectChanges();
+    elCredit.querySelector<HTMLButtonElement>('[data-testid="confirm-customer-credit"]')!.click();
+    fixtureCredit.detectChanges();
+
+    expect(
+      elCredit.querySelector('[data-testid="completed-sale-summary"]')?.textContent,
+    ).toContain('Café Espresso');
+    expect(
+      elCredit.querySelector('[data-testid="completed-payment-method"]')?.textContent,
+    ).toContain('Crédito do cliente');
+    expect(elCredit.querySelector('[data-testid="cancel-sale-btn"]')).toBeNull();
+    fixtureCredit.destroy();
+    TestBed.resetTestingModule();
+
+    // 3. Crédito externo e 4. Débito externo
+    for (const [method, testId, expectedLabel] of [
+      ['EXTERNAL_CREDIT', 'select-method-external-credit', 'Crédito externo'],
+      ['EXTERNAL_DEBIT', 'select-method-external-debit', 'Débito externo'],
+    ] as const) {
+      const fixtureExt = setup();
+      payExternalSpy.mockReturnValue(
+        of({
+          payment: {
+            id: `pay-${method}`,
+            saleId: 'sale-1',
+            method,
+            status: 'APPROVED',
+            amountCents: 2500,
+            gatewayPaymentId: null,
+            qrCode: null,
+            qrCodeBase64: null,
+            createdAt: '2026-11-27T18:03:00.000Z',
+          },
+          sale: {
+            ...openSale,
+            status: 'COMPLETED',
+            completedAt: '2026-11-27T18:03:01.000Z',
+          },
+        } satisfies PaymentResponse),
+      );
+
+      const elExt = await addFirstProductAndProceed(fixtureExt);
+      elExt.querySelector<HTMLButtonElement>(`[data-testid="${testId}"]`)!.click();
+      fixtureExt.detectChanges();
+      elExt.querySelector<HTMLButtonElement>('[data-testid="external-approve-btn"]')!.click();
+      fixtureExt.detectChanges();
+
+      expect(
+        elExt.querySelector('[data-testid="completed-sale-summary"]')?.textContent,
+      ).toContain('Café Espresso');
+      expect(
+        elExt.querySelector('[data-testid="completed-payment-method"]')?.textContent,
+      ).toContain(expectedLabel);
+      expect(elExt.querySelector('[data-testid="cancel-sale-btn"]')).toBeNull();
+      fixtureExt.destroy();
+      TestBed.resetTestingModule();
+    }
+  });
+
+  it('US08 CA2: telas OPEN e PENDING não oferecem atalho para concluir venda sem pagamento confirmado', async () => {
+    const fixture = setup();
+    const pendingSale: Sale = { ...openSale, status: 'PENDING' };
+    payWithPixSpy.mockReturnValue(
+      of({
+        payment: {
+          id: 'pay-pix-pending',
+          saleId: 'sale-1',
+          method: 'PIX',
+          status: 'PENDING',
+          amountCents: 2500,
+          gatewayPaymentId: 'mp-pix-pending',
+          qrCode: '00020126-pending',
+          qrCodeBase64: null,
+          createdAt: '2026-11-27T18:04:00.000Z',
+        },
+        sale: pendingSale,
+      } satisfies PaymentResponse),
+    );
+
+    const el = await addFirstProductAndProceed(fixture);
+
+    const openButtons = Array.from(el.querySelectorAll('button')).map((b) =>
+      (b.textContent ?? '').toLowerCase(),
+    );
+    expect(openButtons.some((text) => text.includes('concluir'))).toBe(false);
+    expect(el.querySelector('[data-testid="sale-status-badge"]')?.textContent).toContain(
+      'Venda aberta',
+    );
+
+    el.querySelector<HTMLButtonElement>('[data-testid="select-method-pix"]')!.click();
+    fixture.detectChanges();
+    el.querySelector<HTMLButtonElement>('[data-testid="generate-pix"]')!.click();
+    fixture.detectChanges();
+
+    const pendingButtons = Array.from(el.querySelectorAll('button')).map((b) =>
+      (b.textContent ?? '').toLowerCase(),
+    );
+    expect(pendingButtons.some((text) => text.includes('concluir'))).toBe(false);
+    expect(el.querySelector('[data-testid="sale-status-badge"]')?.textContent).toContain(
+      'Pendente — aguardando pagamento',
+    );
+  });
+
+  it('US08 CA3: cancelar venda OPEN com confirmação explícita chama cancelSale, desmonta Card Brick e exibe Cancelada — nenhum valor recebido com botão Nova venda', async () => {
+    const fixture = setup();
+    const canceledSale: Sale = {
+      ...openSale,
+      status: 'CANCELED',
+      completedAt: null,
+    };
+    cancelSaleSpy.mockReturnValue(of(canceledSale));
+
+    const el = await addFirstProductAndProceed(fixture);
+
+    const cancelBtn = el.querySelector<HTMLButtonElement>('[data-testid="cancel-sale-btn"]');
+    expect(cancelBtn).not.toBeNull();
+    cancelBtn!.click();
+    fixture.detectChanges();
+
+    expect(el.querySelector('[data-testid="cancel-confirm-modal"]')).not.toBeNull();
+    expect(cancelSaleSpy).not.toHaveBeenCalled();
+
+    el.querySelector<HTMLButtonElement>('[data-testid="confirm-cancel-btn"]')!.click();
+    fixture.detectChanges();
+
+    expect(cancelSaleSpy).toHaveBeenCalledTimes(1);
+    expect(cancelSaleSpy).toHaveBeenCalledWith('sale-1');
+    expect(brickUnmountSpy).toHaveBeenCalled();
+    expect(el.querySelector('[data-testid="cancel-confirm-modal"]')).toBeNull();
+    expect(el.querySelector('[data-testid="sale-status-badge"]')?.textContent).toContain(
+      'Cancelada — nenhum valor recebido',
+    );
+    expect(el.textContent).toContain('Cancelada — nenhum valor recebido');
+    expect(el.querySelector('[data-testid="new-sale"]')).not.toBeNull();
+    expect(el.querySelector('[data-testid="cancel-sale-btn"]')).toBeNull();
+  });
+
+  it('US08 CA3: cancelar venda PENDING com confirmação explícita encerra polling e exibe Cancelada — nenhum valor recebido com botão Nova venda', async () => {
+    const fixture = setup();
+    const pendingSale: Sale = { ...openSale, status: 'PENDING' };
+    const canceledSale: Sale = { ...openSale, status: 'CANCELED', completedAt: null };
+    let unsubscribed = false;
+    const poll$ = new Observable<Sale>(() => {
+      return () => {
+        unsubscribed = true;
+      };
+    });
+
+    payWithPixSpy.mockReturnValue(
+      of({
+        payment: {
+          id: 'pay-pix-cancel',
+          saleId: 'sale-1',
+          method: 'PIX',
+          status: 'PENDING',
+          amountCents: 2500,
+          gatewayPaymentId: 'mp-pix-cancel',
+          qrCode: '00020126-cancel',
+          qrCodeBase64: null,
+          createdAt: '2026-11-27T18:05:00.000Z',
+        },
+        sale: pendingSale,
+      } satisfies PaymentResponse),
+    );
+    pollSaleUntilSettledSpy.mockReturnValue(poll$);
+    cancelSaleSpy.mockReturnValue(of(canceledSale));
+
+    const el = await addFirstProductAndProceed(fixture);
+    el.querySelector<HTMLButtonElement>('[data-testid="select-method-pix"]')!.click();
+    fixture.detectChanges();
+    el.querySelector<HTMLButtonElement>('[data-testid="generate-pix"]')!.click();
+    fixture.detectChanges();
+
+    expect(unsubscribed).toBe(false);
+
+    el.querySelector<HTMLButtonElement>('[data-testid="cancel-sale-btn"]')!.click();
+    fixture.detectChanges();
+    el.querySelector<HTMLButtonElement>('[data-testid="confirm-cancel-btn"]')!.click();
+    fixture.detectChanges();
+
+    expect(cancelSaleSpy).toHaveBeenCalledWith('sale-1');
+    expect(unsubscribed).toBe(true);
+    expect(el.querySelector('[data-testid="sale-status-badge"]')?.textContent).toContain(
+      'Cancelada — nenhum valor recebido',
+    );
+    expect(el.querySelector('[data-testid="new-sale"]')).not.toBeNull();
+  });
+
+  it('US08 CA6: botão Cancelar venda [F8] fica desabilitado com carrinho vazio, abre confirmação por clique ou F8, mantém carrinho com Voltar/Esc e limpa tudo ao confirmar', async () => {
+    const fixture = setup();
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+
+    const cancelCartBtn = el.querySelector<HTMLButtonElement>('[data-testid="cancel-cart-btn"]');
+    expect(cancelCartBtn).not.toBeNull();
+    expect(cancelCartBtn?.textContent).toContain('Cancelar venda [F8]');
+    expect(cancelCartBtn?.disabled).toBe(true);
+
+    // F8 com carrinho vazio não abre modal
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'F8' }));
+    fixture.detectChanges();
+    expect(el.querySelector('[data-testid="cancel-confirm-modal"]')).toBeNull();
+
+    // Adiciona item, altera quantidade, gera erro de código e seleciona cliente
+    addByBarcodeClick(fixture, '7890000000001');
+    const qtyInput = el.querySelector<HTMLInputElement>('[data-testid="quantity-input"]')!;
+    qtyInput.value = '3';
+    qtyInput.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+    addByBarcodeClick(fixture, '0000000000000');
+
+    el.querySelector<HTMLButtonElement>('[data-testid="identify-customer-btn"]')!.click();
+    fixture.detectChanges();
+    el.querySelector<HTMLButtonElement>('[data-testid="select-customer-cust-1"]')!.click();
+    fixture.detectChanges();
+
+    expect(cancelCartBtn?.disabled).toBe(false);
+    expect(el.querySelector('[data-testid="selected-customer-name"]')?.textContent).toContain(
+      'Ana Clara',
+    );
+    expect(el.querySelector('[data-testid="barcode-error"]')).not.toBeNull();
+
+    // Abre por clique e desiste com Voltar
+    cancelCartBtn!.click();
+    fixture.detectChanges();
+    expect(el.querySelector('[data-testid="cancel-confirm-modal"]')).not.toBeNull();
+
+    el.querySelector<HTMLButtonElement>('[data-testid="dismiss-cancel-btn"]')!.click();
+    fixture.detectChanges();
+    expect(el.querySelector('[data-testid="cancel-confirm-modal"]')).toBeNull();
+    expect(el.textContent).toContain('Café Espresso');
+    expect(el.querySelector('[data-testid="selected-customer-name"]')?.textContent).toContain(
+      'Ana Clara',
+    );
+
+    // Abre por F8 e desiste com Escape
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'F8' }));
+    fixture.detectChanges();
+    expect(el.querySelector('[data-testid="cancel-confirm-modal"]')).not.toBeNull();
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    fixture.detectChanges();
+    expect(el.querySelector('[data-testid="cancel-confirm-modal"]')).toBeNull();
+    expect(el.textContent).toContain('Café Espresso');
+
+    // Abre novamente por F8 e confirma
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'F8' }));
+    fixture.detectChanges();
+    el.querySelector<HTMLButtonElement>('[data-testid="confirm-cancel-btn"]')!.click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(el.querySelector('[data-testid="cancel-confirm-modal"]')).toBeNull();
+    expect(el.textContent).toContain(
+      'Nenhum produto adicionado. Bipe um código de barras ou busque por nome para iniciar a venda.',
+    );
+    expect(el.querySelector<HTMLInputElement>('[data-testid="quantity-input"]')?.value).toBe('1');
+    expect(el.querySelector('[data-testid="barcode-error"]')).toBeNull();
+    expect(el.querySelector('[data-testid="selected-customer-name"]')).toBeNull();
+    expect(cancelCartBtn?.disabled).toBe(true);
+    expect(cancelSaleSpy).not.toHaveBeenCalled();
+    expect(createSaleSpy).not.toHaveBeenCalled();
+  });
+
+  it('US08 CA7: desistir com Voltar ou Esc na tela de pagamento não dispara cancelSale; durante carregamento desabilita botões e erro de rede mantém venda e permite retentar', async () => {
+    const fixture = setup();
+    const cancel$ = new Subject<Sale>();
+    cancelSaleSpy.mockReturnValue(cancel$.asObservable());
+
+    const el = await addFirstProductAndProceed(fixture);
+
+    // Abre confirmação e desiste com Voltar
+    el.querySelector<HTMLButtonElement>('[data-testid="cancel-sale-btn"]')!.click();
+    fixture.detectChanges();
+    expect(el.querySelector('[data-testid="cancel-confirm-modal"]')).not.toBeNull();
+
+    el.querySelector<HTMLButtonElement>('[data-testid="dismiss-cancel-btn"]')!.click();
+    fixture.detectChanges();
+    expect(el.querySelector('[data-testid="cancel-confirm-modal"]')).toBeNull();
+    expect(cancelSaleSpy).not.toHaveBeenCalled();
+
+    // Abre confirmação e desiste com Escape
+    el.querySelector<HTMLButtonElement>('[data-testid="cancel-sale-btn"]')!.click();
+    fixture.detectChanges();
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    fixture.detectChanges();
+    expect(el.querySelector('[data-testid="cancel-confirm-modal"]')).toBeNull();
+    expect(cancelSaleSpy).not.toHaveBeenCalled();
+    expect(el.querySelector('[data-testid="sale-status-badge"]')?.textContent).toContain(
+      'Venda aberta',
+    );
+
+    // Confirma e verifica carregamento (botões desabilitados, sem duplo clique)
+    el.querySelector<HTMLButtonElement>('[data-testid="cancel-sale-btn"]')!.click();
+    fixture.detectChanges();
+
+    const confirmBtn = el.querySelector<HTMLButtonElement>('[data-testid="confirm-cancel-btn"]')!;
+    const dismissBtn = el.querySelector<HTMLButtonElement>('[data-testid="dismiss-cancel-btn"]')!;
+    confirmBtn.click();
+    fixture.detectChanges();
+
+    expect(confirmBtn.disabled).toBe(true);
+    expect(dismissBtn.disabled).toBe(true);
+    confirmBtn.click();
+    expect(cancelSaleSpy).toHaveBeenCalledTimes(1);
+
+    // Erro de rede mantém venda OPEN, exibe erro claro e permite tentar novamente
+    cancel$.error(new HttpErrorResponse({ status: 0, statusText: 'Unknown Error' }));
+    fixture.detectChanges();
+
+    expect(el.querySelector('[data-testid="sale-status-badge"]')?.textContent).toContain(
+      'Venda aberta',
+    );
+    const errorEl = el.querySelector('[data-testid="cancel-sale-error"]');
+    expect(errorEl).not.toBeNull();
+    expect(errorEl?.getAttribute('role')).toBe('alert');
+    expect(errorEl?.textContent).toContain('Não foi possível conectar. Tente novamente.');
+    expect(confirmBtn.disabled).toBe(false);
+    expect(dismissBtn.disabled).toBe(false);
+
+    // Nova tentativa após erro consegue concluir o cancelamento
+    cancelSaleSpy.mockReturnValueOnce(
+      of({ ...openSale, status: 'CANCELED', completedAt: null }),
+    );
+    confirmBtn.click();
+    fixture.detectChanges();
+
+    expect(cancelSaleSpy).toHaveBeenCalledTimes(2);
+    expect(el.querySelector('[data-testid="sale-status-badge"]')?.textContent).toContain(
+      'Cancelada — nenhum valor recebido',
+    );
   });
 });

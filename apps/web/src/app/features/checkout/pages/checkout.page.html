@@ -387,7 +387,15 @@
               }
             </button>
 
-            <!-- TODO #8: botão Cancelar venda [F8] com persistência de status CANCELED entra na US08 -->
+            <button
+              type="button"
+              data-testid="cancel-cart-btn"
+              class="w-full rounded-md border border-perigo px-md py-sm text-corpo-destaque text-perigo hover:bg-fundo focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-perigo disabled:border-desabilitado disabled:text-desabilitado"
+              [disabled]="creatingSale() || cart().length === 0"
+              (click)="openCancelCartConfirm()"
+            >
+              Cancelar venda [F8]
+            </button>
           </section>
         </aside>
       </div>
@@ -486,24 +494,72 @@
         @if (currentSale.status === 'COMPLETED') {
           <div class="flex flex-col gap-md rounded-md border border-sucesso p-md">
             <p class="text-titulo-secao text-sucesso">Venda concluída — pagamento confirmado!</p>
-            @if (lastPayment()?.method === 'CUSTOMER_CREDIT') {
-              <p class="text-corpo text-texto">
-                O pagamento da venda #{{ currentSale.number }} foi confirmado via Crédito do cliente.
-              </p>
-              @if (completedCustomerBalanceCents() !== null) {
-                <p data-testid="completed-customer-balance" class="text-corpo-destaque text-sucesso">
-                  Saldo restante do cliente: {{ formatCents(completedCustomerBalanceCents()!) }}
-                </p>
-              }
-            } @else if (completedExternalMethodLabel(); as externalLabel) {
+
+            @if (completedPaymentMethodLabel(); as paymentLabel) {
               <p data-testid="completed-payment-method" class="text-corpo text-texto">
-                O pagamento da venda #{{ currentSale.number }} foi registrado via {{ externalLabel }}.
+                Forma de pagamento confirmada:
+                <strong class="text-corpo-destaque text-texto">{{ paymentLabel }}</strong>
               </p>
             } @else {
               <p class="text-corpo text-texto">
-                O pagamento da venda #{{ currentSale.number }} foi confirmado pelo gateway.
+                O pagamento da venda #{{ currentSale.number }} foi confirmado.
               </p>
             }
+
+            @if (
+              lastPayment()?.method === 'CUSTOMER_CREDIT' &&
+              completedCustomerBalanceCents() !== null
+            ) {
+              <p data-testid="completed-customer-balance" class="text-corpo-destaque text-sucesso">
+                Saldo restante do cliente: {{ formatCents(completedCustomerBalanceCents()!) }}
+              </p>
+            }
+
+            <div
+              data-testid="completed-sale-summary"
+              class="flex flex-col gap-sm rounded-md border border-desabilitado bg-fundo p-md"
+            >
+              <h3 class="text-corpo-destaque text-texto">Resumo da venda #{{ currentSale.number }}</h3>
+
+              @if (completedSaleItems().length > 0) {
+                <div class="overflow-x-auto">
+                  <table class="w-full border-collapse text-left">
+                    <thead>
+                      <tr class="border-b border-desabilitado text-legenda text-texto-suave">
+                        <th class="py-xs pr-sm font-semibold">Produto</th>
+                        <th class="py-xs pr-sm font-semibold">Qtd</th>
+                        <th class="py-xs text-right font-semibold">Subtotal</th>
+                      </tr>
+                    </thead>
+                    <tbody class="divide-y divide-desabilitado">
+                      @for (item of completedSaleItems(); track item.id) {
+                        <tr class="text-corpo text-texto">
+                          <td class="py-xs pr-sm text-corpo-destaque text-texto">
+                            {{ item.name }}
+                          </td>
+                          <td class="py-xs pr-sm text-legenda text-texto-suave">
+                            {{ item.quantity }} un
+                          </td>
+                          <td class="py-xs text-right text-corpo-destaque text-texto">
+                            {{ formatCents(item.subtotalCents) }}
+                          </td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+              }
+
+              <div
+                class="flex items-center justify-between border-t border-desabilitado pt-sm text-corpo-destaque text-texto"
+              >
+                <span>Total pago</span>
+                <span class="text-titulo-secao text-sucesso">
+                  {{ formatCents(currentSale.totalCents) }}
+                </span>
+              </div>
+            </div>
+
             <div>
               <button
                 type="button"
@@ -568,7 +624,7 @@
               </p>
             }
 
-            <div>
+            <div class="flex flex-wrap items-center gap-sm">
               <button
                 type="button"
                 data-testid="new-sale"
@@ -576,6 +632,16 @@
                 (click)="startNewSale()"
               >
                 Voltar ao caixa
+              </button>
+
+              <button
+                type="button"
+                data-testid="cancel-sale-btn"
+                class="rounded-md border border-perigo px-md py-sm text-corpo-destaque text-perigo hover:bg-fundo focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-perigo disabled:border-desabilitado disabled:text-desabilitado"
+                [disabled]="submittingPayment() || cancelingSale()"
+                (click)="openCancelSaleConfirm()"
+              >
+                Cancelar venda
               </button>
             </div>
           </div>
@@ -854,6 +920,35 @@
               </div>
             }
           }
+
+          <div class="flex justify-end border-t border-desabilitado pt-md">
+            <button
+              type="button"
+              data-testid="cancel-sale-btn"
+              class="rounded-md border border-perigo px-md py-sm text-corpo-destaque text-perigo hover:bg-fundo focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-perigo disabled:border-desabilitado disabled:text-desabilitado"
+              [disabled]="submittingPayment() || cancelingSale()"
+              (click)="openCancelSaleConfirm()"
+            >
+              Cancelar venda
+            </button>
+          </div>
+        } @else if (currentSale.status === 'CANCELED') {
+          <div class="flex flex-col gap-md rounded-md border border-perigo p-md">
+            <p class="text-titulo-secao text-perigo">Cancelada — nenhum valor recebido</p>
+            <p class="text-corpo text-texto">
+              A venda #{{ currentSale.number }} foi cancelada sem recebimento de valor.
+            </p>
+            <div>
+              <button
+                type="button"
+                data-testid="new-sale"
+                class="rounded-md bg-primaria px-md py-sm text-corpo-destaque text-superficie hover:brightness-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primaria"
+                (click)="startNewSale()"
+              >
+                Nova venda
+              </button>
+            </div>
+          </div>
         }
       </section>
     }
@@ -1152,6 +1247,73 @@
             (click)="closeCustomerModal()"
           >
             Cancelar
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+
+  @if (cancelConfirmMode(); as mode) {
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="cancel-confirm-modal-title"
+      data-testid="cancel-confirm-modal"
+      class="fixed inset-0 z-50 flex items-center justify-center bg-texto/40 p-md backdrop-blur-sm"
+      (click)="onCancelModalBackdropClick($event)"
+      (keydown.escape)="closeCancelConfirm()"
+    >
+      <div
+        class="flex w-full max-w-md flex-col gap-md rounded-2xl border border-desabilitado bg-superficie p-lg shadow-xl"
+      >
+        <div class="flex items-start gap-sm border-b border-desabilitado pb-md">
+          <span class="material-symbols-outlined text-perigo" aria-hidden="true">cancel</span>
+          <div>
+            <h2 id="cancel-confirm-modal-title" class="text-titulo-secao text-texto">
+              @if (mode === 'CART') {
+                Cancelar venda atual?
+              } @else {
+                Cancelar venda #{{ sale()?.number }}?
+              }
+            </h2>
+            <p class="mt-xs text-corpo text-texto-suave">
+              @if (mode === 'CART') {
+                Todos os itens do carrinho e o cliente selecionado serão removidos.
+              } @else {
+                Nenhum valor será recebido e eventuais pagamentos pendentes serão abandonados.
+              }
+            </p>
+          </div>
+        </div>
+
+        @if (cancelError(); as message) {
+          <p role="alert" data-testid="cancel-sale-error" class="text-corpo text-perigo">
+            {{ message }}
+          </p>
+        }
+
+        <div class="flex flex-wrap justify-end gap-sm pt-xs">
+          <button
+            type="button"
+            data-testid="dismiss-cancel-btn"
+            class="rounded-md border border-desabilitado px-md py-sm text-corpo-destaque text-texto hover:bg-fundo focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primaria disabled:text-desabilitado"
+            [disabled]="cancelingSale()"
+            (click)="closeCancelConfirm()"
+          >
+            Voltar
+          </button>
+          <button
+            type="button"
+            data-testid="confirm-cancel-btn"
+            class="rounded-md bg-perigo px-md py-sm text-corpo-destaque text-superficie hover:brightness-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-perigo disabled:bg-desabilitado disabled:text-texto-suave"
+            [disabled]="cancelingSale()"
+            (click)="confirmCancel()"
+          >
+            @if (cancelingSale()) {
+              Cancelando...
+            } @else {
+              Confirmar cancelamento
+            }
           </button>
         </div>
       </div>
