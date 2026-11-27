@@ -1,6 +1,6 @@
 ---
 issue: 6
-status: rascunho
+status: aprovada
 ---
 
 # US07 — Registrar pagamento externo de crédito ou débito
