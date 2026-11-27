@@ -5,8 +5,9 @@ import {
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
-import { SaleStatus } from '../../../generated/prisma/enums.js';
+import { PaymentStatus, SaleStatus } from '../../../generated/prisma/enums.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
+import { canTransitionSale } from '../payments/payment-state-machine.js';
 import { CreateSaleDto } from './dto/create-sale.dto.js';
 
 const SALE_DETAILS_INCLUDE = {
@@ -109,5 +110,76 @@ export class SalesService {
     }
 
     return sale;
+  }
+
+  async cancel(id: string, requesterId: string) {
+    const sale = await this.prisma.sale.findUnique({
+      where: { id },
+    });
+
+    if (!sale) {
+      throw new NotFoundException('Venda não encontrada.');
+    }
+
+    if (sale.operatorId !== requesterId) {
+      throw new ForbiddenException(
+        'Você não tem permissão para cancelar esta venda.',
+      );
+    }
+
+    this.assertCancelableStatus(sale.status);
+
+    return this.prisma.$transaction(async (tx) => {
+      const updated = await tx.sale.updateMany({
+        where: {
+          id: sale.id,
+          status: { in: [SaleStatus.OPEN, SaleStatus.PENDING] },
+        },
+        data: { status: SaleStatus.CANCELED },
+      });
+
+      if (updated.count === 0) {
+        const current = await tx.sale.findUnique({
+          where: { id: sale.id },
+        });
+        if (!current) {
+          throw new NotFoundException('Venda não encontrada.');
+        }
+        this.throwUncancelableStatus(current.status);
+      }
+
+      await tx.payment.updateMany({
+        where: {
+          saleId: sale.id,
+          status: PaymentStatus.PENDING,
+        },
+        data: { status: PaymentStatus.ABANDONED },
+      });
+
+      return tx.sale.findUniqueOrThrow({
+        where: { id: sale.id },
+        include: SALE_DETAILS_INCLUDE,
+      });
+    });
+  }
+
+  private assertCancelableStatus(status: SaleStatus): void {
+    if (!canTransitionSale(status, SaleStatus.CANCELED)) {
+      this.throwUncancelableStatus(status);
+    }
+  }
+
+  private throwUncancelableStatus(status: SaleStatus): never {
+    if (status === SaleStatus.COMPLETED) {
+      throw new UnprocessableEntityException(
+        'Uma venda concluída não pode ser cancelada.',
+      );
+    }
+    if (status === SaleStatus.CANCELED) {
+      throw new UnprocessableEntityException('A venda já está cancelada.');
+    }
+    throw new UnprocessableEntityException(
+      'Não é possível cancelar esta venda no estado atual.',
+    );
   }
 }

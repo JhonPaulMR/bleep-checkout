@@ -18,6 +18,7 @@ import {
   CheckoutService,
   ExternalPaymentMethod,
   Payment,
+  PaymentMethod,
   PayWithCardPayload,
   Product,
   Sale,
@@ -32,16 +33,27 @@ const EXTERNAL_DECLINED_MESSAGE =
 const DEFAULT_PAYER_EMAIL = 'operador@bleep.local';
 const CARD_BRICK_CONTAINER_ID = 'card-payment-brick-container';
 
-type CheckoutPaymentMethod =
-  | 'CARD'
-  | 'PIX'
-  | 'CUSTOMER_CREDIT'
-  | 'EXTERNAL_CREDIT'
-  | 'EXTERNAL_DEBIT';
+const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
+  CARD: 'Cartão de crédito',
+  PIX: 'PIX',
+  CUSTOMER_CREDIT: 'Crédito do cliente',
+  EXTERNAL_CREDIT: 'Crédito externo',
+  EXTERNAL_DEBIT: 'Débito externo',
+};
+
+type CancelConfirmMode = 'CART' | 'SALE' | null;
 
 interface CartItem {
   product: Product;
   quantity: number;
+}
+
+interface CompletedSaleSummaryItem {
+  id: string;
+  name: string;
+  quantity: number;
+  unitPriceCents: number;
+  subtotalCents: number;
 }
 
 interface BrickFormData {
@@ -171,11 +183,15 @@ export class CheckoutPage {
 
   protected readonly sale = signal<Sale | null>(null);
   protected readonly lastPayment = signal<Payment | null>(null);
-  protected readonly selectedMethod = signal<CheckoutPaymentMethod>('CARD');
+  protected readonly selectedMethod = signal<PaymentMethod>('CARD');
   protected readonly completedCustomerBalanceCents = signal<number | null>(null);
   protected readonly activeSaleCustomer = computed(
     () => this.sale()?.customer ?? this.selectedCustomer(),
   );
+
+  protected readonly cancelConfirmMode = signal<CancelConfirmMode>(null);
+  protected readonly cancelingSale = signal(false);
+  protected readonly cancelError = signal<string | null>(null);
 
   protected readonly brickLoading = signal(false);
   protected readonly submittingPayment = signal(false);
@@ -204,11 +220,34 @@ export class CheckoutPage {
     this.selectedExternalMethod() === 'EXTERNAL_DEBIT' ? 'Débito externo' : 'Crédito externo',
   );
 
-  protected readonly completedExternalMethodLabel = computed<string | null>(() => {
-    const method = this.lastPayment()?.method;
-    if (method === 'EXTERNAL_CREDIT') return 'Crédito externo';
-    if (method === 'EXTERNAL_DEBIT') return 'Débito externo';
-    return null;
+  protected readonly completedPaymentMethodLabel = computed<string | null>(() => {
+    const approvedMethod = this.sale()?.payments?.find((p) => p.status === 'APPROVED')?.method;
+    const method = approvedMethod ?? this.lastPayment()?.method;
+    return method ? PAYMENT_METHOD_LABELS[method] : null;
+  });
+
+  protected readonly completedSaleItems = computed<CompletedSaleSummaryItem[]>(() => {
+    const currentSale = this.sale();
+    if (currentSale?.items && currentSale.items.length > 0) {
+      return currentSale.items.map((item) => {
+        const fallbackProduct = this.cart().find((c) => c.product.id === item.productId)?.product;
+        return {
+          id: item.id,
+          name: item.product?.name ?? fallbackProduct?.name ?? 'Produto',
+          quantity: item.quantity,
+          unitPriceCents: item.unitPriceCents,
+          subtotalCents: item.unitPriceCents * item.quantity,
+        };
+      });
+    }
+
+    return this.cart().map((item) => ({
+      id: item.product.id,
+      name: item.product.name,
+      quantity: item.quantity,
+      unitPriceCents: item.product.priceCents,
+      subtotalCents: item.product.priceCents * item.quantity,
+    }));
   });
 
   protected readonly isCardDeclined = computed(() => {
@@ -227,6 +266,11 @@ export class CheckoutPage {
 
   protected onWindowKeydown(event: KeyboardEvent): void {
     if (event.key === 'Escape') {
+      if (this.cancelConfirmMode() !== null) {
+        event.preventDefault();
+        this.closeCancelConfirm();
+        return;
+      }
       if (this.searchModalOpen()) {
         event.preventDefault();
         this.closeSearchModal();
@@ -239,7 +283,8 @@ export class CheckoutPage {
       }
     }
 
-    const anyModalOpen = this.searchModalOpen() || this.customerModalOpen();
+    const anyModalOpen =
+      this.searchModalOpen() || this.customerModalOpen() || this.cancelConfirmMode() !== null;
 
     if (event.key === 'F2' && !this.sale() && !anyModalOpen) {
       event.preventDefault();
@@ -256,6 +301,18 @@ export class CheckoutPage {
     if (event.key === 'F4' && !this.sale() && !anyModalOpen) {
       event.preventDefault();
       this.focusBarcodeInput();
+      return;
+    }
+
+    if (
+      event.key === 'F8' &&
+      !this.sale() &&
+      !anyModalOpen &&
+      !this.creatingSale() &&
+      this.cart().length > 0
+    ) {
+      event.preventDefault();
+      this.openCancelCartConfirm();
     }
   }
 
@@ -496,7 +553,7 @@ export class CheckoutPage {
     });
   }
 
-  protected selectPaymentMethod(method: CheckoutPaymentMethod): void {
+  protected selectPaymentMethod(method: PaymentMethod): void {
     const currentSale = this.sale();
     if (!currentSale || currentSale.status !== 'OPEN' || this.submittingPayment()) return;
     if (this.selectedMethod() === method) return;
@@ -634,6 +691,91 @@ export class CheckoutPage {
     }
   }
 
+  protected openCancelCartConfirm(): void {
+    if (this.creatingSale() || this.sale() || this.cart().length === 0) return;
+    this.cancelError.set(null);
+    this.cancelConfirmMode.set('CART');
+  }
+
+  protected openCancelSaleConfirm(): void {
+    const currentSale = this.sale();
+    if (
+      !currentSale ||
+      (currentSale.status !== 'OPEN' && currentSale.status !== 'PENDING') ||
+      this.submittingPayment() ||
+      this.cancelingSale()
+    ) {
+      return;
+    }
+    this.cancelError.set(null);
+    this.cancelConfirmMode.set('SALE');
+  }
+
+  protected closeCancelConfirm(): void {
+    if (this.cancelingSale()) return;
+    const mode = this.cancelConfirmMode();
+    this.cancelConfirmMode.set(null);
+    this.cancelError.set(null);
+    if (mode === 'CART') {
+      this.focusBarcodeInput();
+    }
+  }
+
+  protected onCancelModalBackdropClick(event: MouseEvent): void {
+    if (event.target === event.currentTarget && !this.cancelingSale()) {
+      this.closeCancelConfirm();
+    }
+  }
+
+  protected confirmCancel(): void {
+    const mode = this.cancelConfirmMode();
+    if (mode === 'CART') {
+      this.cart.set([]);
+      this.quantityInput.set('1');
+      this.quantityError.set(null);
+      this.barcodeTerm.set('');
+      this.barcodeError.set(null);
+      this.saleError.set(null);
+      this.selectedCustomer.set(null);
+      this.customerSearchTerm.set('');
+      this.customerError.set(null);
+      this.cancelConfirmMode.set(null);
+      this.cancelError.set(null);
+      this.focusBarcodeInput();
+      return;
+    }
+
+    if (mode === 'SALE') {
+      const currentSale = this.sale();
+      if (
+        !currentSale ||
+        (currentSale.status !== 'OPEN' && currentSale.status !== 'PENDING') ||
+        this.cancelingSale()
+      ) {
+        return;
+      }
+
+      this.cancelError.set(null);
+      this.cancelingSale.set(true);
+
+      this.checkoutService.cancelSale(currentSale.id).subscribe({
+        next: (canceledSale) => {
+          this.cancelingSale.set(false);
+          this.cancelConfirmMode.set(null);
+          this.cancelError.set(null);
+          this.stopPolling();
+          this.unmountCardBrick();
+          this.sale.set(canceledSale);
+        },
+        error: (err: unknown) => {
+          this.cancelingSale.set(false);
+          if (err instanceof HttpErrorResponse && err.status === 401) return;
+          this.cancelError.set(this.extractErrorMessage(err));
+        },
+      });
+    }
+  }
+
   protected startNewSale(): void {
     // TODO #12: vendas deixadas em PENDING permanecem no banco para retomada ou cancelamento na tela de Vendas Pendentes (US11).
     this.stopPolling();
@@ -655,6 +797,9 @@ export class CheckoutPage {
     this.customerModalOpen.set(false);
     this.customerSearchTerm.set('');
     this.customerError.set(null);
+    this.cancelConfirmMode.set(null);
+    this.cancelingSale.set(false);
+    this.cancelError.set(null);
   }
 
   private initializeCardBrick(currentSale: Sale): void {
@@ -828,6 +973,10 @@ export class CheckoutPage {
         if (updatedSale.status !== 'PENDING') {
           this.sale.set(updatedSale);
           this.stopPolling();
+          if (updatedSale.status === 'COMPLETED' || updatedSale.status === 'CANCELED') {
+            this.cancelConfirmMode.set(null);
+            this.cancelError.set(null);
+          }
           if (updatedSale.status === 'OPEN') {
             this.declinedMessage.set(CARD_DECLINED_MESSAGE);
           }
