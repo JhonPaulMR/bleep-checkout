@@ -12,6 +12,6 @@
 | #5 | [005-inserir-quantidade-de-produtos-na-venda](005-inserir-quantidade-de-produtos-na-venda/spec.md) | implementada | US04 — Inserir quantidade de produtos na venda |
 | #7 | [007-pagar-com-credito-do-cliente](007-pagar-com-credito-do-cliente/spec.md) | implementada | US05 — Pagar com crédito do cliente |
 | #6 | [006-registrar-pagamento-externo-de-credito-ou-debito](006-registrar-pagamento-externo-de-credito-ou-debito/spec.md) | implementada | US07 — Registrar pagamento externo de crédito ou débito |
-| #8 | [008-concluir-ou-cancelar-uma-venda](008-concluir-ou-cancelar-uma-venda/spec.md) | rascunho | US08 — Concluir ou cancelar uma venda |
+| #8 | [008-concluir-ou-cancelar-uma-venda](008-concluir-ou-cancelar-uma-venda/spec.md) | implementada | US08 — Concluir ou cancelar uma venda |
 
 Estados: `rascunho` · `aprovada` · `implementada` · `bloqueada`

@@ -156,7 +156,7 @@ Essas relações representam o núcleo do domínio sem definir banco, endpoints 
 
 **Regras relacionadas:** RN10, RN11
 
-### US08 — Concluir ou cancelar uma venda · `Must Have` · `M` · Status: `🟡 Ready`
+### US08 — Concluir ou cancelar uma venda · `Must Have` · `M` · Status: `🟢 Live`
 
 **Como** operador de caixa, **eu quero** concluir uma venda somente depois de uma forma de pagamento válida ou cancelá-la quando necessário **para que** o registro das vendas não contenha compras pagas incorretamente.
 
