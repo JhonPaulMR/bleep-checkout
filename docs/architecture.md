@@ -1,8 +1,8 @@
 # 🛠️ Architecture / Software Design Document
 
 **Projeto:** Bleep Checkout
-**Versão:** 1.0.10 · fechamento da US04 (inserir quantidade de produtos na venda)
-**Última atualização:** 26/11/2026
+**Versão:** 1.0.12 · fechamento da US07 (registrar pagamento externo de crédito ou débito)
+**Última atualização:** 27/11/2026
 
 > 🤖 **O `prd.md` responde _o quê_ o produto faz. Este responde _onde as coisas
 > moram e como se chamam_.** Detalhe de tela — rota, componente, contrato —
@@ -318,7 +318,7 @@ stateDiagram-v2
 | Produtos | `apps/api/src/modules/products` | `JwtAuthGuard` + `RolesGuard` (`@Roles(Role.MANAGER)` em `POST /products`; `@Roles(Role.MANAGER, Role.OPERATOR)` em `GET /products` com `?search=`; `@Roles(Role.OPERATOR)` em `GET /products/barcode/:barcode`) | `ProductsService` / `PrismaService` | US01 (#1), US03 (#4), US06 (#3) |
 | Clientes | `apps/api/src/modules/customers` | `JwtAuthGuard` + `RolesGuard` (`@Roles(Role.MANAGER)` em `POST /customers` e `POST /customers/:id/credits`; `@Roles(Role.MANAGER, Role.OPERATOR)` em `GET /customers`) | `CustomersService` / `PrismaService` | US02 (#2), US12 (#13) |
 | Vendas | `apps/api/src/modules/sales` | `JwtAuthGuard` + `RolesGuard` (`@Roles(Role.OPERATOR)` em `POST /sales` com `customerId` opcional e `GET /sales/:id`; regra de dono `operatorId === sub`) | `SalesService` / `PrismaService` | US04 (#5), US05 (#7), US06 (#3) |
-| Pagamentos | `apps/api/src/modules/payments` | `JwtAuthGuard` + `RolesGuard` (`@Roles(Role.OPERATOR)` em `GET /payments/config` e `POST /sales/:id/payments/card\|pix\|credit`; regra de dono) | `PaymentsService` / `PrismaService` + `PaymentGateway` | US05 (#7), US06 (#3) |
+| Pagamentos | `apps/api/src/modules/payments` | `JwtAuthGuard` + `RolesGuard` (`@Roles(Role.OPERATOR)` em `GET /payments/config` e `POST /sales/:id/payments/card\|pix\|credit\|external`; regra de dono) | `PaymentsService` / `PrismaService` + `PaymentGateway` | US05 (#7), US06 (#3), US07 (#6) |
 | Webhooks | `apps/api/src/modules/webhooks` | `@Public()` em `POST /webhooks/mercadopago` protegido por HMAC-SHA256 (`WebhookSignatureValidator`) | `WebhooksService` / `PrismaService` + `PaymentGateway` | US06 (#3) |
 
 ---
@@ -339,6 +339,7 @@ stateDiagram-v2
 | 26/11/2026 | 1.0.9 | Fechamento da US03 (#4): consulta por código de barras (`GET /products/barcode/:barcode`), filtro `?search=` em `GET /products` e simulador de caixa/modal de busca fiéis a `caixa.html` e `busca.html` |
 | 26/11/2026 | 1.0.10 | Fechamento da US04 (#5): seletor de quantidade prévia (`Nº de unidades [F2]`) no simulador de caixa e no modal de busca por nome + cobertura e2e de rejeição `400` para quantidades inválidas em `POST /sales` |
 | 26/11/2026 | 1.0.11 | Fechamento da US05 (#7): `customerId` opcional em `POST /sales`, `POST /sales/:id/payments/credit` com débito atômico condicional e `CreditTransaction` `SALE_DEBIT`, card/modal `Cliente da Venda [F3]` e opção `Crédito do cliente` na `CheckoutPage` |
+| 27/11/2026 | 1.0.12 | Fechamento da US07 (#6): `POST /sales/:id/payments/external` com `PayExternalDto` e transação atômica, `CheckoutService.payExternal()` e opções `Crédito externo` / `Débito externo` com confirmação explícita na `CheckoutPage` |
 
 ---
 

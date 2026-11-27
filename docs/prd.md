@@ -144,7 +144,7 @@ Essas relações representam o núcleo do domínio sem definir banco, endpoints 
 
 **Regras relacionadas:** RN08, RN10
 
-### US07 — Registrar pagamento externo de crédito ou débito · `Must Have` · `S` · Status: `🟡 Ready`
+### US07 — Registrar pagamento externo de crédito ou débito · `Must Have` · `S` · Status: `🟢 Live`
 
 **Como** operador de caixa, **eu quero** registrar que uma venda foi paga por crédito ou débito em uma máquina externa **para que** o sistema mantenha o registro da forma de pagamento sem controlar a máquina.
 
