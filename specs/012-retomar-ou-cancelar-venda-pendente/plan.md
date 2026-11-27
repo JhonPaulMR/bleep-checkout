@@ -20,7 +20,7 @@
 
 ## Tarefas
 
-- [ ] **Tarefa 1 — Implementar `GET /sales?status=PENDING` e `POST /sales/:id/reopen` na API (unit + e2e)**
+- [x] **Tarefa 1 — Implementar `GET /sales?status=PENDING` e `POST /sales/:id/reopen` na API (unit + e2e)**
   - Cobre: CA1 (lado da API — listagem de vendas `PENDING` apenas do operador autenticado com `customer`, `items` e `payments`), CA2 (lista vazia `[]`), CA5 (lado da API — `POST /sales/:id/reopen` transitando `Sale` `PENDING → OPEN` e `Payment` `PENDING → ABANDONED` em `prisma.$transaction`, mantendo proteção contra webhook PIX atrasado), CA6 (`422` `"A venda não está pendente para reabertura."` para `OPEN`/`COMPLETED`/`CANCELED`, `403` para `MANAGER`/outro `OPERATOR` e `404` venda inexistente)
   - Teste primeiro: testes unitários em `sales.service.spec.ts` (`findAllForOperator` filtrando por operador e status, e `reopen` em `PENDING`, `404`, `403`, `422` em `OPEN`/`COMPLETED`/`CANCELED` e corrida `updateMany.count === 0`) e testes e2e em `apps/api/test/sales.e2e-spec.ts` contra PostgreSQL real cobrindo `GET /sales?status=PENDING` (isolamento entre operadores, lista vazia, `403` `MANAGER`, `400` status inválido) e `POST /sales/:id/reopen` (`201`, `401`, `403`, `404`, `422` e webhook PIX atrasado após `reopen` ignorado sem concluir a venda); falham porque as rotas e métodos ainda não existem
   - Arquivos previstos: `apps/api/src/modules/sales/dto/list-sales-query.dto.ts`, `apps/api/src/modules/sales/sales.controller.ts`, `apps/api/src/modules/sales/sales.service.ts`, `apps/api/src/modules/sales/sales.service.spec.ts`, `apps/api/test/sales.e2e-spec.ts`
