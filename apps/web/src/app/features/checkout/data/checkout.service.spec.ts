@@ -455,6 +455,27 @@ describe('CheckoutService', () => {
     expect(result).toEqual(canceledSale);
   });
 
+  it('reopenSale() faz POST /sales/:id/reopen com saleId codificado e corpo vazio, desembrulhando { data }', () => {
+    let result: Sale | undefined;
+    const reopenedSale: Sale = {
+      ...sampleSale,
+      id: 'sale/1',
+      status: 'OPEN',
+      completedAt: null,
+    };
+
+    service.reopenSale('sale/1').subscribe((sale) => {
+      result = sale;
+    });
+
+    const req = controller.expectOne(`${apiUrl}/sales/sale%2F1/reopen`);
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body).toEqual({});
+    req.flush({ data: reopenedSale });
+
+    expect(result).toEqual(reopenedSale);
+  });
+
   it('pollSaleUntilSettled() consulta GET /sales/:id periodicamente e encerra ao sair de PENDING', async () => {
     vi.useFakeTimers();
     const pendingSale: Sale = { ...sampleSale, status: 'PENDING' };
