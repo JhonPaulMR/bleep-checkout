@@ -1,7 +1,7 @@
 # 🛠️ Architecture / Software Design Document
 
 **Projeto:** Bleep Checkout
-**Versão:** 1.0.13 · fechamento da US08 (concluir ou cancelar uma venda)
+**Versão:** 1.0.14 · fechamento da US11 (retomar ou cancelar venda pendente)
 **Última atualização:** 27/11/2026
 
 > 🤖 **O `prd.md` responde _o quê_ o produto faz. Este responde _onde as coisas
@@ -288,7 +288,7 @@ stateDiagram-v2
   OPEN --> PENDING: Cartão in_process/pending ou PIX gerado
   OPEN --> CANCELED: POST /sales/:id/cancel
   PENDING --> COMPLETED: Webhook confirma approved
-  PENDING --> OPEN: Webhook confirma rejected (nova tentativa)
+  PENDING --> OPEN: Webhook rejected ou POST /sales/:id/reopen (Payment → ABANDONED)
   PENDING --> CANCELED: POST /sales/:id/cancel (Payment → ABANDONED)
   COMPLETED --> [*]
   CANCELED --> [*]
@@ -320,7 +320,7 @@ stateDiagram-v2
 | Usuários / Operadores | `apps/api/src/modules/users` | `JwtAuthGuard` + `RolesGuard` (`@Roles(Role.MANAGER)` em `POST/GET /users`; regra de dono em `GET /users/:id`) | `UsersService` / `PrismaService` | US10 (#11) |
 | Produtos | `apps/api/src/modules/products` | `JwtAuthGuard` + `RolesGuard` (`@Roles(Role.MANAGER)` em `POST /products`; `@Roles(Role.MANAGER, Role.OPERATOR)` em `GET /products` com `?search=`; `@Roles(Role.OPERATOR)` em `GET /products/barcode/:barcode`) | `ProductsService` / `PrismaService` | US01 (#1), US03 (#4), US06 (#3) |
 | Clientes | `apps/api/src/modules/customers` | `JwtAuthGuard` + `RolesGuard` (`@Roles(Role.MANAGER)` em `POST /customers` e `POST /customers/:id/credits`; `@Roles(Role.MANAGER, Role.OPERATOR)` em `GET /customers`) | `CustomersService` / `PrismaService` | US02 (#2), US12 (#13) |
-| Vendas | `apps/api/src/modules/sales` | `JwtAuthGuard` + `RolesGuard` (`@Roles(Role.OPERATOR)` em `POST /sales` com `customerId` opcional, `GET /sales/:id` e `POST /sales/:id/cancel`; regra de dono `operatorId === sub`) | `SalesService` / `PrismaService` | US04 (#5), US05 (#7), US06 (#3), US08 (#8) |
+| Vendas | `apps/api/src/modules/sales` | `JwtAuthGuard` + `RolesGuard` (`@Roles(Role.OPERATOR)` em `POST /sales` com `customerId` opcional, `GET /sales` com `?status=`, `GET /sales/:id`, `POST /sales/:id/cancel` e `POST /sales/:id/reopen`; regra de dono `operatorId === sub`) | `SalesService` / `PrismaService` | US04 (#5), US05 (#7), US06 (#3), US08 (#8), US11 (#12) |
 | Pagamentos | `apps/api/src/modules/payments` | `JwtAuthGuard` + `RolesGuard` (`@Roles(Role.OPERATOR)` em `GET /payments/config` e `POST /sales/:id/payments/card\|pix\|credit\|external`; regra de dono) | `PaymentsService` / `PrismaService` + `PaymentGateway` | US05 (#7), US06 (#3), US07 (#6) |
 | Webhooks | `apps/api/src/modules/webhooks` | `@Public()` em `POST /webhooks/mercadopago` protegido por HMAC-SHA256 (`WebhookSignatureValidator`) | `WebhooksService` / `PrismaService` + `PaymentGateway` | US06 (#3) |
 
@@ -344,6 +344,7 @@ stateDiagram-v2
 | 26/11/2026 | 1.0.11 | Fechamento da US05 (#7): `customerId` opcional em `POST /sales`, `POST /sales/:id/payments/credit` com débito atômico condicional e `CreditTransaction` `SALE_DEBIT`, card/modal `Cliente da Venda [F3]` e opção `Crédito do cliente` na `CheckoutPage` |
 | 27/11/2026 | 1.0.12 | Fechamento da US07 (#6): `POST /sales/:id/payments/external` com `PayExternalDto` e transação atômica, `CheckoutService.payExternal()` e opções `Crédito externo` / `Débito externo` com confirmação explícita na `CheckoutPage` |
 | 27/11/2026 | 1.0.13 | Fechamento da US08 (#8): `POST /sales/:id/cancel` com transação atômica (`OPEN`/`PENDING` → `CANCELED` e `Payment PENDING` → `ABANDONED`, `422` em `COMPLETED`/`CANCELED`), `CheckoutService.cancelSale()`, resumo completo de venda `COMPLETED` e cancelamento com confirmação (`[F8]` e pagamento) na `CheckoutPage` |
+| 27/11/2026 | 1.0.14 | Fechamento da US11 (#12): `GET /sales?status=PENDING` (isolado por operador), `POST /sales/:id/reopen` (`PENDING` → `OPEN` + `Payment PENDING` → `ABANDONED` em transação atômica), tela `PendingSalesPage` (`/pendentes`), link no cabeçalho do operador e retomada/troca de forma na `CheckoutPage` |
 
 ---
 
