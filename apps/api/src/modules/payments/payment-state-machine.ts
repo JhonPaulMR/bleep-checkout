@@ -1,8 +1,16 @@
 import { PaymentStatus, SaleStatus } from '../../../generated/prisma/enums.js';
 
 const SALE_TRANSITIONS: Record<SaleStatus, ReadonlySet<SaleStatus>> = {
-  [SaleStatus.OPEN]: new Set([SaleStatus.COMPLETED, SaleStatus.PENDING]),
-  [SaleStatus.PENDING]: new Set([SaleStatus.COMPLETED, SaleStatus.OPEN]),
+  [SaleStatus.OPEN]: new Set([
+    SaleStatus.COMPLETED,
+    SaleStatus.PENDING,
+    SaleStatus.CANCELED,
+  ]),
+  [SaleStatus.PENDING]: new Set([
+    SaleStatus.COMPLETED,
+    SaleStatus.OPEN,
+    SaleStatus.CANCELED,
+  ]),
   [SaleStatus.COMPLETED]: new Set(),
   [SaleStatus.CANCELED]: new Set(),
 };

@@ -62,4 +62,30 @@ export class SalesController {
   ) {
     return this.sales.findByIdForOperator(id, request.user.sub);
   }
+
+  @Post(':id/cancel')
+  @Roles(Role.OPERATOR)
+  @ApiOperation({
+    summary: 'Cancela uma venda em aberto ou pendente do operador autenticado',
+  })
+  @ApiResponse({ status: 201, description: 'Venda cancelada com sucesso' })
+  @ApiResponse({
+    status: 401,
+    description: 'Sessão ausente, inválida ou expirada',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Acesso negado para outro operador ou gerente',
+  })
+  @ApiResponse({ status: 404, description: 'Venda não encontrada.' })
+  @ApiResponse({
+    status: 422,
+    description: 'Venda já concluída ou já cancelada',
+  })
+  cancel(
+    @Param('id') id: string,
+    @Req() request: { user: JwtPayload },
+  ) {
+    return this.sales.cancel(id, request.user.sub);
+  }
 }

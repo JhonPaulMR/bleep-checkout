@@ -4,7 +4,7 @@ import {
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
-import { SaleStatus } from '../../../generated/prisma/enums.js';
+import { PaymentStatus, SaleStatus } from '../../../generated/prisma/enums.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { SalesService } from './sales.service.js';
 
@@ -19,6 +19,11 @@ describe('SalesService', () => {
     sale: {
       create: ReturnType<typeof vi.fn>;
       findUnique: ReturnType<typeof vi.fn>;
+      findUniqueOrThrow: ReturnType<typeof vi.fn>;
+      updateMany: ReturnType<typeof vi.fn>;
+    };
+    payment: {
+      updateMany: ReturnType<typeof vi.fn>;
     };
     $transaction: ReturnType<typeof vi.fn>;
   };
@@ -35,6 +40,11 @@ describe('SalesService', () => {
       sale: {
         create: vi.fn(),
         findUnique: vi.fn(),
+        findUniqueOrThrow: vi.fn(),
+        updateMany: vi.fn(),
+      },
+      payment: {
+        updateMany: vi.fn(),
       },
       $transaction: vi.fn(),
     };
@@ -363,6 +373,221 @@ describe('SalesService', () => {
         .catch((e) => e);
 
       expect(error).toBeInstanceOf(ForbiddenException);
+    });
+  });
+
+  describe('cancel', () => {
+    it('cancela venda OPEN pertencente ao operador dentro de transação atômica mantendo completedAt nulo', async () => {
+      prisma.sale.findUnique.mockResolvedValue({
+        id: 'sale-open-1',
+        operatorId: 'op-1',
+        status: SaleStatus.OPEN,
+        completedAt: null,
+      });
+      prisma.sale.updateMany.mockResolvedValue({ count: 1 });
+      prisma.payment.updateMany.mockResolvedValue({ count: 0 });
+      const canceledSale = {
+        id: 'sale-open-1',
+        number: 10,
+        operatorId: 'op-1',
+        status: SaleStatus.CANCELED,
+        totalCents: 1850,
+        completedAt: null,
+        items: [],
+        payments: [],
+        customer: null,
+      };
+      prisma.sale.findUniqueOrThrow.mockResolvedValue(canceledSale);
+
+      const result = await service.cancel('sale-open-1', 'op-1');
+
+      expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+      expect(prisma.sale.updateMany).toHaveBeenCalledWith({
+        where: {
+          id: 'sale-open-1',
+          status: { in: [SaleStatus.OPEN, SaleStatus.PENDING] },
+        },
+        data: { status: SaleStatus.CANCELED },
+      });
+      expect(prisma.payment.updateMany).toHaveBeenCalledWith({
+        where: {
+          saleId: 'sale-open-1',
+          status: PaymentStatus.PENDING,
+        },
+        data: { status: PaymentStatus.ABANDONED },
+      });
+      expect(prisma.sale.findUniqueOrThrow).toHaveBeenCalledWith({
+        where: { id: 'sale-open-1' },
+        include: {
+          items: { include: { product: true } },
+          payments: { orderBy: { createdAt: 'asc' } },
+          customer: true,
+        },
+      });
+      expect(result).toEqual(canceledSale);
+      expect(result.completedAt).toBeNull();
+    });
+
+    it('cancela venda PENDING e marca Payment PENDING como ABANDONED na mesma transação', async () => {
+      prisma.sale.findUnique.mockResolvedValue({
+        id: 'sale-pending-1',
+        operatorId: 'op-1',
+        status: SaleStatus.PENDING,
+        completedAt: null,
+      });
+      prisma.sale.updateMany.mockResolvedValue({ count: 1 });
+      prisma.payment.updateMany.mockResolvedValue({ count: 1 });
+      const canceledSale = {
+        id: 'sale-pending-1',
+        number: 11,
+        operatorId: 'op-1',
+        status: SaleStatus.CANCELED,
+        totalCents: 3500,
+        completedAt: null,
+        items: [],
+        payments: [
+          {
+            id: 'pay-1',
+            saleId: 'sale-pending-1',
+            status: PaymentStatus.ABANDONED,
+          },
+        ],
+        customer: null,
+      };
+      prisma.sale.findUniqueOrThrow.mockResolvedValue(canceledSale);
+
+      const result = await service.cancel('sale-pending-1', 'op-1');
+
+      expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+      expect(prisma.sale.updateMany).toHaveBeenCalledWith({
+        where: {
+          id: 'sale-pending-1',
+          status: { in: [SaleStatus.OPEN, SaleStatus.PENDING] },
+        },
+        data: { status: SaleStatus.CANCELED },
+      });
+      expect(prisma.payment.updateMany).toHaveBeenCalledWith({
+        where: {
+          saleId: 'sale-pending-1',
+          status: PaymentStatus.PENDING,
+        },
+        data: { status: PaymentStatus.ABANDONED },
+      });
+      expect(result).toEqual(canceledSale);
+    });
+
+    it('rejeita com NotFoundException quando a venda não existe', async () => {
+      prisma.sale.findUnique.mockResolvedValue(null);
+
+      const error = await service
+        .cancel('sale-inexistente', 'op-1')
+        .catch((e) => e);
+
+      expect(error).toBeInstanceOf(NotFoundException);
+      expect((error as NotFoundException).message).toBe(
+        'Venda não encontrada.',
+      );
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
+
+    it('rejeita com ForbiddenException quando outro operador tenta cancelar a venda', async () => {
+      prisma.sale.findUnique.mockResolvedValue({
+        id: 'sale-1',
+        operatorId: 'op-1',
+        status: SaleStatus.OPEN,
+      });
+
+      const error = await service.cancel('sale-1', 'op-2').catch((e) => e);
+
+      expect(error).toBeInstanceOf(ForbiddenException);
+      expect((error as ForbiddenException).message).toBe(
+        'Você não tem permissão para cancelar esta venda.',
+      );
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
+
+    it('rejeita com UnprocessableEntityException quando a venda já está COMPLETED', async () => {
+      prisma.sale.findUnique.mockResolvedValue({
+        id: 'sale-done',
+        operatorId: 'op-1',
+        status: SaleStatus.COMPLETED,
+      });
+
+      const error = await service.cancel('sale-done', 'op-1').catch((e) => e);
+
+      expect(error).toBeInstanceOf(UnprocessableEntityException);
+      expect((error as UnprocessableEntityException).message).toBe(
+        'Uma venda concluída não pode ser cancelada.',
+      );
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
+
+    it('rejeita com UnprocessableEntityException quando a venda já está CANCELED', async () => {
+      prisma.sale.findUnique.mockResolvedValue({
+        id: 'sale-canceled',
+        operatorId: 'op-1',
+        status: SaleStatus.CANCELED,
+      });
+
+      const error = await service
+        .cancel('sale-canceled', 'op-1')
+        .catch((e) => e);
+
+      expect(error).toBeInstanceOf(UnprocessableEntityException);
+      expect((error as UnprocessableEntityException).message).toBe(
+        'A venda já está cancelada.',
+      );
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
+
+    it('em corrida (updateMany.count === 0) quando a venda foi concluída simultaneamente, lança 422 de venda concluída sem abandonar pagamentos', async () => {
+      prisma.sale.findUnique
+        .mockResolvedValueOnce({
+          id: 'sale-race-completed',
+          operatorId: 'op-1',
+          status: SaleStatus.PENDING,
+        })
+        .mockResolvedValueOnce({
+          id: 'sale-race-completed',
+          operatorId: 'op-1',
+          status: SaleStatus.COMPLETED,
+        });
+      prisma.sale.updateMany.mockResolvedValue({ count: 0 });
+
+      const error = await service
+        .cancel('sale-race-completed', 'op-1')
+        .catch((e) => e);
+
+      expect(error).toBeInstanceOf(UnprocessableEntityException);
+      expect((error as UnprocessableEntityException).message).toBe(
+        'Uma venda concluída não pode ser cancelada.',
+      );
+      expect(prisma.payment.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('em corrida (updateMany.count === 0) quando a venda já foi cancelada simultaneamente, lança 422 de venda já cancelada sem abandonar pagamentos', async () => {
+      prisma.sale.findUnique
+        .mockResolvedValueOnce({
+          id: 'sale-race-canceled',
+          operatorId: 'op-1',
+          status: SaleStatus.OPEN,
+        })
+        .mockResolvedValueOnce({
+          id: 'sale-race-canceled',
+          operatorId: 'op-1',
+          status: SaleStatus.CANCELED,
+        });
+      prisma.sale.updateMany.mockResolvedValue({ count: 0 });
+
+      const error = await service
+        .cancel('sale-race-canceled', 'op-1')
+        .catch((e) => e);
+
+      expect(error).toBeInstanceOf(UnprocessableEntityException);
+      expect((error as UnprocessableEntityException).message).toBe(
+        'A venda já está cancelada.',
+      );
+      expect(prisma.payment.updateMany).not.toHaveBeenCalled();
     });
   });
 });

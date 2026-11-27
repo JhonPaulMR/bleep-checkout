@@ -9,8 +9,10 @@ describe('payment-state-machine', () => {
     it.each<[SaleStatus, SaleStatus]>([
       [SaleStatus.OPEN, SaleStatus.COMPLETED],
       [SaleStatus.OPEN, SaleStatus.PENDING],
+      [SaleStatus.OPEN, SaleStatus.CANCELED],
       [SaleStatus.PENDING, SaleStatus.COMPLETED],
       [SaleStatus.PENDING, SaleStatus.OPEN],
+      [SaleStatus.PENDING, SaleStatus.CANCELED],
     ])('permite transição de %s para %s', (from, to) => {
       expect(canTransitionSale(from, to)).toBe(true);
     });
@@ -26,8 +28,6 @@ describe('payment-state-machine', () => {
       [SaleStatus.PENDING, SaleStatus.PENDING],
       [SaleStatus.COMPLETED, SaleStatus.COMPLETED],
       [SaleStatus.CANCELED, SaleStatus.CANCELED],
-      [SaleStatus.OPEN, SaleStatus.CANCELED],
-      [SaleStatus.PENDING, SaleStatus.CANCELED],
     ])('bloqueia transição de %s para %s', (from, to) => {
       expect(canTransitionSale(from, to)).toBe(false);
     });

@@ -24,7 +24,7 @@
 
 ## Tarefas
 
-- [ ] **Tarefa 1 — Implementar `POST /sales/:id/cancel` com transação atômica e transições `OPEN/PENDING → CANCELED` na API (unit + e2e)**
+- [x] **Tarefa 1 — Implementar `POST /sales/:id/cancel` com transação atômica e transições `OPEN/PENDING → CANCELED` na API (unit + e2e)**
   - Cobre: CA3 (lado da API — `OPEN`/`PENDING` → `CANCELED` com `completedAt` nulo e `Payment` `PENDING` → `ABANDONED` em transação atômica), CA4 (`422` para `COMPLETED` e `CANCELED`, além de proteção contra webhook PIX atrasado após cancelamento), CA5 (`403` para `MANAGER` ou outro `OPERATOR` e `404` para venda inexistente)
   - Teste primeiro: testes unitários em `sales.service.spec.ts` (cancelamento de `OPEN`, cancelamento de `PENDING` abandonando `Payment` `PENDING`, `404`, `403`, `422` em `COMPLETED`/`CANCELED` e corrida `updateMany.count === 0`) e testes e2e em `apps/api/test/sales.e2e-spec.ts` contra PostgreSQL real cobrindo `201` para `OPEN` e `PENDING`, `401`, `403` (`MANAGER` e outro `OPERATOR`), `404` e `422` (`COMPLETED` e `CANCELED`, mais garantia de que webhook/pagamento posterior não conclui venda cancelada); falham porque `POST /sales/:id/cancel` e `SalesService.cancel` ainda não existem
   - Arquivos previstos: `apps/api/src/modules/payments/payment-state-machine.ts`, `apps/api/src/modules/payments/payment-state-machine.spec.ts`, `apps/api/src/modules/sales/sales.controller.ts`, `apps/api/src/modules/sales/sales.service.ts`, `apps/api/src/modules/sales/sales.service.spec.ts`, `apps/api/test/sales.e2e-spec.ts`
