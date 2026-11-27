@@ -495,6 +495,10 @@
                   Saldo restante do cliente: {{ formatCents(completedCustomerBalanceCents()!) }}
                 </p>
               }
+            } @else if (completedExternalMethodLabel(); as externalLabel) {
+              <p data-testid="completed-payment-method" class="text-corpo text-texto">
+                O pagamento da venda #{{ currentSale.number }} foi registrado via {{ externalLabel }}.
+              </p>
             } @else {
               <p class="text-corpo text-texto">
                 O pagamento da venda #{{ currentSale.number }} foi confirmado pelo gateway.
@@ -627,21 +631,61 @@
             >
               Crédito do cliente
             </button>
+
+            <button
+              type="button"
+              data-testid="select-method-external-credit"
+              class="rounded-md px-md py-sm text-corpo-destaque focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primaria disabled:bg-desabilitado"
+              [class.bg-primaria]="selectedMethod() === 'EXTERNAL_CREDIT'"
+              [class.text-superficie]="selectedMethod() === 'EXTERNAL_CREDIT'"
+              [class.hover:brightness-90]="selectedMethod() === 'EXTERNAL_CREDIT'"
+              [class.border]="selectedMethod() !== 'EXTERNAL_CREDIT'"
+              [class.border-primaria]="selectedMethod() !== 'EXTERNAL_CREDIT'"
+              [class.text-primaria]="selectedMethod() !== 'EXTERNAL_CREDIT'"
+              [class.hover:bg-fundo]="selectedMethod() !== 'EXTERNAL_CREDIT'"
+              [disabled]="submittingPayment()"
+              (click)="selectPaymentMethod('EXTERNAL_CREDIT')"
+            >
+              Crédito externo
+            </button>
+
+            <button
+              type="button"
+              data-testid="select-method-external-debit"
+              class="rounded-md px-md py-sm text-corpo-destaque focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primaria disabled:bg-desabilitado"
+              [class.bg-primaria]="selectedMethod() === 'EXTERNAL_DEBIT'"
+              [class.text-superficie]="selectedMethod() === 'EXTERNAL_DEBIT'"
+              [class.hover:brightness-90]="selectedMethod() === 'EXTERNAL_DEBIT'"
+              [class.border]="selectedMethod() !== 'EXTERNAL_DEBIT'"
+              [class.border-primaria]="selectedMethod() !== 'EXTERNAL_DEBIT'"
+              [class.text-primaria]="selectedMethod() !== 'EXTERNAL_DEBIT'"
+              [class.hover:bg-fundo]="selectedMethod() !== 'EXTERNAL_DEBIT'"
+              [disabled]="submittingPayment()"
+              (click)="selectPaymentMethod('EXTERNAL_DEBIT')"
+            >
+              Débito externo
+            </button>
           </div>
 
           @if (declinedMessage(); as message) {
-            <div class="flex flex-col gap-sm rounded-md border border-perigo p-md" role="alert">
+            <div
+              data-testid="payment-declined-alert"
+              class="flex flex-col gap-sm rounded-md border border-perigo p-md"
+              role="alert"
+            >
               <p class="text-corpo-destaque text-perigo">{{ message }}</p>
-              <div>
-                <button
-                  type="button"
-                  data-testid="retry-card"
-                  class="rounded-md border border-primaria px-md py-xs text-corpo-destaque text-primaria hover:bg-fundo focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primaria"
-                  (click)="retryCardPayment()"
-                >
-                  Tentar novamente com cartão
-                </button>
-              </div>
+              @if (isCardDeclined()) {
+                <div>
+                  <button
+                    type="button"
+                    data-testid="retry-card"
+                    class="rounded-md border border-primaria px-md py-xs text-corpo-destaque text-primaria hover:bg-fundo focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primaria"
+                    (click)="retryCardPayment()"
+                  >
+                    Tentar novamente com cartão
+                  </button>
+                </div>
+              }
             </div>
           }
 
@@ -676,6 +720,51 @@
                     Gerando PIX...
                   } @else {
                     Gerar QR Code PIX
+                  }
+                </button>
+              </div>
+            </div>
+          } @else if (selectedExternalMethod()) {
+            <div
+              data-testid="external-payment-panel"
+              class="flex flex-col gap-md rounded-md border border-desabilitado bg-fundo p-md"
+            >
+              <div class="flex flex-col gap-xs">
+                <p class="text-titulo-secao text-texto">
+                  {{ selectedExternalMethodLabel() }} — máquina externa
+                </p>
+                <p class="text-corpo text-texto-suave">
+                  Realize a cobrança de {{ formatCents(currentSale.totalCents) }} na maquininha e
+                  confirme abaixo o resultado exibido no terminal externo.
+                </p>
+              </div>
+
+              <div class="flex flex-wrap gap-sm">
+                <button
+                  type="button"
+                  data-testid="external-approve-btn"
+                  class="rounded-md bg-sucesso px-md py-sm text-corpo-destaque text-superficie hover:brightness-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sucesso disabled:bg-desabilitado disabled:text-texto-suave"
+                  [disabled]="submittingPayment()"
+                  (click)="submitExternalPayment(true)"
+                >
+                  @if (submittingPayment()) {
+                    Registrando...
+                  } @else {
+                    Aprovado na máquina
+                  }
+                </button>
+
+                <button
+                  type="button"
+                  data-testid="external-decline-btn"
+                  class="rounded-md bg-perigo px-md py-sm text-corpo-destaque text-superficie hover:brightness-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-perigo disabled:bg-desabilitado disabled:text-texto-suave"
+                  [disabled]="submittingPayment()"
+                  (click)="submitExternalPayment(false)"
+                >
+                  @if (submittingPayment()) {
+                    Registrando...
+                  } @else {
+                    Não aprovado na máquina
                   }
                 </button>
               </div>
